@@ -82,7 +82,6 @@ jobs:
 
   promote-prod:
     needs: push-ecr-deploy-staging
-    if: ${{ needs.push-ecr-deploy-staging.result == 'success' && needs.push-ecr-deploy-staging.outputs.deploy_ready == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
