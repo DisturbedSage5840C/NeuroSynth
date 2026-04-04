@@ -22,8 +22,8 @@ from pydantic import BaseModel
 
 
 LOGGER = structlog.get_logger(__name__)
-JWKS_URL = os.getenv("NEURO_JWKS_URL", "https://example.org/.well-known/jwks.json")
-API_ALLOWED_ORIGINS = os.getenv("NEURO_ALLOWED_ORIGINS", "https://neurosynth.example.org").split(",")
+JWKS_URL = os.getenv("NEURO_JWKS_URL", "")
+API_ALLOWED_ORIGINS = [x for x in os.getenv("NEURO_ALLOWED_ORIGINS", "http://localhost").split(",") if x]
 TIMESCALE_DSN = os.getenv("NEURO_TIMESCALE_DSN", "postgresql://postgres:postgres@timescaledb:5432/neurosynth")
 
 celery_app = Celery("neurosynth", broker=os.getenv("NEURO_REDIS_URL", "redis://localhost:6379/0"), backend=os.getenv("NEURO_REDIS_URL", "redis://localhost:6379/0"))
@@ -126,6 +126,9 @@ async def _validate_patient_and_data(patient_id: str, analysis_config: dict[str,
 
 async def _fetch_jwks() -> dict:
     import httpx
+
+    if not JWKS_URL:
+        raise HTTPException(status_code=503, detail="JWKS endpoint is not configured")
 
     async with httpx.AsyncClient(timeout=10.0) as c:
         r = await c.get(JWKS_URL)

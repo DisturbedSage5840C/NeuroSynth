@@ -7,7 +7,7 @@ name = "neurosynth"
 version = "0.1.0"
 description = "NeuroSynth data lakehouse and ingestion pipeline"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
   "pydantic==2.7.4",
   "pydantic-settings==2.3.4",

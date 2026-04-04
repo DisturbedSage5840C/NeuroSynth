@@ -27,6 +27,7 @@ module "storage" {
 
 module "iam" {
   source = "./modules/iam"
+  eks_oidc_provider_arn = var.eks_oidc_provider_arn
 }
 
 module "eks" {
@@ -44,4 +45,6 @@ module "databases" {
 
 module "monitoring" {
   source = "./modules/monitoring"
+  audit_bucket_name = var.audit_bucket_name
+  healthlake_kms_key_arn = var.healthlake_kms_key_arn
 }

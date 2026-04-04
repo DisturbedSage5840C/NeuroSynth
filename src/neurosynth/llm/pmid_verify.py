@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass
 
@@ -8,11 +9,11 @@ from Bio import Entrez
 
 @dataclass
 class PMIDVerifier:
-    email: str = "neurosynth@example.org"
+    email: str = ""
     ttl_seconds: int = 24 * 3600
 
     def __post_init__(self) -> None:
-        Entrez.email = self.email
+        Entrez.email = self.email or os.getenv("NEURO_ENTREZ_EMAIL", "noreply@localhost")
         self._cache: dict[str, tuple[float, bool]] = {}
 
     def is_valid(self, pmid: str) -> bool:

@@ -72,6 +72,26 @@ pip install -e '.[test]'
 docker compose up -d
 pytest -q
 
+## Training Workflow
+
+Use the orchestrator to run or preview model training stages:
+
+python scripts/train_orchestrator.py --dry-run
+
+The orchestrator writes a structured summary to artifacts/train_orchestrator_summary.json.
+
+## Release Gate
+
+Before public deployment, run the release gate:
+
+python scripts/release_gate.py
+
+This checks:
+
+- Source compilation integrity
+- Placeholder and hardcoded test-value leakage
+- Required runtime environment variables for auth and orchestration
+
 ## Current State
 
 This repository contains a complete multi-phase implementation scaffold with substantial functional code across all core subsystems. Production hardening tasks are tracked and being actively tightened module by module.

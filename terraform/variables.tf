@@ -23,3 +23,15 @@ variable "private_subnet_ids" {
 variable "timescale_kms_key_arn" {
   type = string
 }
+
+variable "eks_oidc_provider_arn" {
+  type = string
+}
+
+variable "audit_bucket_name" {
+  type = string
+}
+
+variable "healthlake_kms_key_arn" {
+  type = string
+}

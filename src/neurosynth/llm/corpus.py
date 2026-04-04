@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 import uuid
 from pathlib import Path
@@ -18,8 +19,9 @@ class NeuroCorpusBuilder:
         '(biomarkers[MeSH] OR drug therapy[MeSH] OR diagnosis[MeSH] OR prognosis[MeSH])'
     )
 
-    def __init__(self, email: str = "neurosynth@example.org", api_key: str | None = None) -> None:
-        Entrez.email = email
+    def __init__(self, email: str | None = None, api_key: str | None = None) -> None:
+        resolved_email = email or os.getenv("NEURO_ENTREZ_EMAIL", "noreply@localhost")
+        Entrez.email = resolved_email
         if api_key:
             Entrez.api_key = api_key
 
