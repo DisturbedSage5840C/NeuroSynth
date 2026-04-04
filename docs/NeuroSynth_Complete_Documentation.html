@@ -12,7 +12,7 @@
     font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
     color: #1a1a2e;
     background: #fff;
-    line-height: 1.6;
+    line-height: 1.58;
     max-width: 210mm;
     margin: 0 auto;
     padding: 20px 30px;
@@ -29,21 +29,11 @@
     text-align: center;
   }
   .cover h1 { font-size: 38px; color: #0a0a0a; margin-bottom: 8px; letter-spacing: -1px; }
-  .cover .accent { color: #0d9488; }
-  .cover .subtitle { font-size: 18px; color: #555; margin-bottom: 20px; }
+  .cover .accent { color: #00bcd4; }
+  .cover .subtitle { font-size: 18px; color: #555; margin-bottom: 10px; }
   .cover .meta { font-size: 13px; color: #888; margin-top: 30px; }
-  .badge {
-    display: inline-block;
-    padding: 6px 18px;
-    border-radius: 20px;
-    background: #0d9488;
-    color: #fff;
-    font-weight: 600;
-    font-size: 13px;
-    margin: 5px;
-  }
 
-  h1 { font-size: 22px; color: #0a0a0a; border-bottom: 3px solid #0d9488; padding-bottom: 6px; margin-top: 30px; page-break-after: avoid; }
+  h1 { font-size: 22px; color: #0a0a0a; border-bottom: 3px solid #00bcd4; padding-bottom: 6px; margin-top: 30px; page-break-after: avoid; }
   h2 { font-size: 17px; color: #1a1a2e; margin-top: 24px; page-break-after: avoid; }
   h3 { font-size: 14px; color: #333; margin-top: 18px; page-break-after: avoid; }
 
@@ -59,7 +49,7 @@
     border-radius: 3px;
     font-family: "SF Mono", "Fira Code", monospace;
     font-size: 10px;
-    color: #b91c1c;
+    color: #c62828;
   }
   pre {
     background: #1a1a2e;
@@ -72,95 +62,72 @@
     page-break-inside: avoid;
   }
 
-  .mermaid-container {
-    text-align: center;
-    margin: 16px 0;
-    page-break-inside: avoid;
-    background: #fafafa;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 16px;
-  }
-
   .section-break { page-break-before: always; }
   .toc li { margin: 4px 0; }
-  .toc a { color: #0f766e; text-decoration: none; }
+  .toc a { text-decoration: none; color: #00838f; }
 
-  .info-box {
-    background: #e0f7fa;
-    border-left: 4px solid #0d9488;
-    padding: 10px 14px;
-    border-radius: 0 6px 6px 0;
-    margin: 12px 0;
-    font-size: 11px;
+  .badge {
+    display: inline-block; padding: 6px 18px; border-radius: 20px;
+    background: #00bcd4; color: #fff; font-weight: 600; font-size: 13px; margin: 5px;
   }
 
+  .info-box {
+    background: #e0f7fa; border-left: 4px solid #00bcd4; padding: 10px 14px;
+    border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 11px;
+  }
   .warn-box {
-    background: #fff7ed;
-    border-left: 4px solid #f97316;
-    padding: 10px 14px;
-    border-radius: 0 6px 6px 0;
-    margin: 12px 0;
-    font-size: 11px;
+    background: #fff7ed; border-left: 4px solid #f97316; padding: 10px 14px;
+    border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 11px;
+  }
+
+  .mermaid-container {
+    text-align: center; margin: 16px 0; page-break-inside: avoid;
+    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px;
   }
 
   .stat-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin: 16px 0;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0;
   }
   .stat-card {
-    background: #fafafa;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 12px;
-    text-align: center;
-    border-top: 3px solid #0d9488;
+    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 12px; text-align: center; border-top: 3px solid #00bcd4;
   }
   .stat-card .num { font-size: 24px; font-weight: 700; color: #0a0a0a; }
   .stat-card .label { font-size: 10px; color: #666; margin-top: 2px; }
 
-  footer {
-    text-align: center;
-    color: #999;
-    font-size: 9px;
-    margin-top: 40px;
-    border-top: 1px solid #eee;
-    padding-top: 10px;
-  }
+  footer { text-align: center; color: #999; font-size: 9px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 10px; }
 </style>
 </head>
 <body>
 
 <div class="cover">
-  <h1>NeuroSynth <span class="accent">Documentation</span></h1>
-  <div class="subtitle">Complete A to Z Project Report</div>
-  <div class="subtitle" style="font-size:14px; color:#888;">Enterprise foundation plus minimal runnable ML core</div>
+  <h1>NeuroSynth <span class="accent">Tracker</span></h1>
+  <div class="subtitle">Complete System Documentation</div>
+  <div class="subtitle" style="font-size:14px; color:#888;">A to Z technical report with architecture, flow, and operations</div>
 
-  <div class="info-box" style="max-width:680px; text-align:left;">
-    <strong>Problem:</strong> The original project vision was powerful but too complex for solo execution. The current implementation preserves the original architecture while introducing a practical local pipeline that trains and serves neurological risk predictions from real OASIS longitudinal data.
+  <div style="max-width:680px; margin:16px auto; padding:12px 18px; background:#f8f9fa; border-left:4px solid #00bcd4; border-radius:4px; text-align:left; font-size:11px; line-height:1.6; color:#444;">
+    <strong>Problem Statement:</strong> The original NeuroSynth vision had strong enterprise potential but high operational complexity. The current revision keeps the same repository and strategic direction while delivering a practical, real-data baseline that runs locally and can be deployed quickly.
   </div>
 
-  <div style="margin: 26px 0;">
+  <div style="margin: 30px 0;">
     <span class="badge">Python</span>
     <span class="badge">FastAPI</span>
     <span class="badge">scikit-learn</span>
     <span class="badge">HTML</span>
     <span class="badge">Gradio</span>
-    <span class="badge">CI</span>
+    <span class="badge">GitHub CI</span>
   </div>
 
-  <div class="stat-grid" style="max-width: 620px;">
-    <div class="stat-card"><div class="num">68</div><div class="label">Files at Root Scope</div></div>
-    <div class="stat-card"><div class="num">247</div><div class="label">Files Under src</div></div>
-    <div class="stat-card"><div class="num">102</div><div class="label">Files Under tests</div></div>
-    <div class="stat-card"><div class="num">24</div><div class="label">Real Test Payloads</div></div>
+  <div class="stat-grid" style="max-width: 560px;">
+    <div class="stat-card"><div class="num">68</div><div class="label">Root Scope Files</div></div>
+    <div class="stat-card"><div class="num">247</div><div class="label">Source Files</div></div>
+    <div class="stat-card"><div class="num">102</div><div class="label">Test Files</div></div>
+    <div class="stat-card"><div class="num">24</div><div class="label">Real Test Cases</div></div>
   </div>
 
   <div class="meta">
-    <p>Version: April 2026 Documentation Release</p>
-    <p>Generated for: NeuroSynth repository</p>
+    <p>Version: 2026.04 Documentation</p>
+    <p>Generated for NeuroSynth repository</p>
   </div>
 </div>
 
@@ -168,133 +135,137 @@
 <div class="toc">
 <ol>
   <li><a href="#overview">Project Overview</a></li>
-  <li><a href="#stack">Technology Stack</a></li>
-  <li><a href="#architecture">System Architecture</a></li>
-  <li><a href="#data-model">Data and Modeling Contract</a></li>
-  <li><a href="#runtime">Runtime Flow and API</a></li>
-  <li><a href="#files">Key Files Explained</a></li>
-  <li><a href="#testing">Testing and Validation</a></li>
-  <li><a href="#ops">Operations Guide</a></li>
-  <li><a href="#compare">Original vs Current Comparison</a></li>
-  <li><a href="#roadmap">Slow Migration Back to Advanced Vision</a></li>
-  <li><a href="#appendix">Appendix</a></li>
+  <li><a href="#stack">Technologies Used</a></li>
+  <li><a href="#arch">System Architecture Diagram</a></li>
+  <li><a href="#data">Dataset and Model Pipeline</a></li>
+  <li><a href="#flow">Request Flow Sequence</a></li>
+  <li><a href="#files">Every Key File Explained</a></li>
+  <li><a href="#api">API Reference</a></li>
+  <li><a href="#testing">Testing Matrix</a></li>
+  <li><a href="#ops">Deployment and Run Guide</a></li>
+  <li><a href="#compare">Original vs Current</a></li>
+  <li><a href="#roadmap">Roadmap to Advanced NeuroSynth</a></li>
+  <li><a href="#appendix">Appendix and Metrics</a></li>
 </ol>
 </div>
 
 <div class="section-break"></div>
 <h1 id="overview">1. Project Overview</h1>
-<p><strong>NeuroSynth</strong> currently runs as a focused neurological risk prediction platform with a minimal local-first workflow, while preserving the larger enterprise structure for future expansion.</p>
+<p><strong>NeuroSynth</strong> is now a runnable neurological risk prediction system built from real OASIS longitudinal records while preserving the original repository's advanced architecture footprint.</p>
 
 <div class="info-box">
-<strong>Current objective:</strong> Enable immediate end-to-end operation by one developer using an OASIS CSV file, local model training, FastAPI inference, browser testing, and optional Gradio deployment.
+<strong>Current practical mission:</strong> turn the repository into something you can run daily with predictable behavior: inspect data, train model, serve predictions, validate results, and share a deployable interface.
 </div>
 
 <div class="warn-box">
-<strong>Clinical boundary:</strong> This implementation is a technical baseline and not a clinically validated medical decision system.
+<strong>Boundary:</strong> This baseline supports product iteration and demonstration. Clinical production use requires external validation, governance, and regulatory process.
 </div>
 
-<h1 id="stack">2. Technology Stack</h1>
+<h1 id="stack">2. Technologies Used</h1>
 <table>
-  <tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr>
-  <tr><td>Training</td><td>pandas, scikit-learn, joblib</td><td>Load OASIS data, train RandomForest model, export artifacts</td></tr>
-  <tr><td>Inference API</td><td>FastAPI, Pydantic</td><td>Strongly typed request schema and prediction endpoint</td></tr>
-  <tr><td>Frontend</td><td>Plain HTML, CSS, JavaScript</td><td>Simple manual input form and prediction display</td></tr>
-  <tr><td>Deployment Option</td><td>Gradio</td><td>Fast publish path on Hugging Face Spaces</td></tr>
-  <tr><td>Automation</td><td>zsh script</td><td>One command setup, training, smoke test, server startup</td></tr>
-  <tr><td>Repository Foundation</td><td>Terraform, Helm, tests, scripts, CI workflows</td><td>Preserved enterprise capability for phased reintegration</td></tr>
+  <tr><th>Layer</th><th>Technology</th><th>Language</th><th>Purpose</th></tr>
+  <tr><td>Data Exploration</td><td>pandas</td><td>Python</td><td>CSV profiling, null analysis, label distribution checks</td></tr>
+  <tr><td>Training</td><td>scikit-learn RandomForest</td><td>Python</td><td>Binary classification over 8 biomarkers</td></tr>
+  <tr><td>Model Serialization</td><td>joblib</td><td>Python</td><td>Persist model and label encoder artifacts</td></tr>
+  <tr><td>API Service</td><td>FastAPI + Pydantic</td><td>Python</td><td>Typed schema and prediction endpoint</td></tr>
+  <tr><td>Frontend</td><td>Vanilla HTML/CSS/JS</td><td>HTML + JS</td><td>Interactive browser-based input and response display</td></tr>
+  <tr><td>Free Hosting Option</td><td>Gradio</td><td>Python</td><td>Public demo deployment via Spaces</td></tr>
+  <tr><td>Automation</td><td>zsh script</td><td>Shell</td><td>One-command setup, training, smoke test, and serve</td></tr>
 </table>
 
-<h1 id="architecture">3. System Architecture</h1>
+<h1 id="arch">3. System Architecture Diagram</h1>
 <div class="mermaid-container">
-  <h3>Current Minimal Runtime Architecture</h3>
+  <h3>Minimal Runtime Architecture</h3>
   <div class="mermaid">
-graph TD
-  U[User Browser] --> H[index.html]
-  H -->|POST /predict| A[FastAPI main.py]
-  A --> M[model.pkl]
-  A --> L[label_encoder.pkl]
-  D[oasis_longitudinal.csv] --> T[train.py]
-  T --> M
-  T --> L
-  E[explore.py] --> D
-  R[run_local.sh] --> E
-  R --> T
-  R --> A
+graph TB
+    CSV[oasis_longitudinal.csv] --> EXP[explore.py]
+    CSV --> TRN[train.py]
+    TRN --> MOD[model.pkl]
+    TRN --> ENC[label_encoder.pkl]
+    MOD --> API[FastAPI main.py]
+    ENC --> API
+    WEB[index.html] -->|POST /predict| API
+    GRD[app.py Gradio] --> MOD
+    GRD --> ENC
+    RUN[run_local.sh] --> EXP
+    RUN --> TRN
+    RUN --> API
   </div>
 </div>
 
 <div class="mermaid-container">
-  <h3>Repository Capability Layers</h3>
+  <h3>Repository Layering</h3>
   <div class="mermaid">
 graph LR
-  Core[Minimal Core in Root] --> Next[Stable Product Baseline]
-  Next --> Mid[Container and Staging]
-  Mid --> Adv[Re-enable Advanced Modules in src]
-  Adv --> Ent[Infra-backed Enterprise Rollout]
+  A[Preserved Enterprise Assets] --> B[Minimal Core Product]
+  B --> C[Stability and Test Hardening]
+  C --> D[Staged MLOps Reintegration]
+  D --> E[Full Advanced NeuroSynth Path]
   </div>
 </div>
 
-<h1 id="data-model">4. Data and Modeling Contract</h1>
-<h3>Dataset</h3>
-<p>Input file: <code>oasis_longitudinal.csv</code> at project root.</p>
-
-<h3>Feature Set</h3>
+<h1 id="data">4. Dataset and Model Pipeline</h1>
+<h3>Dataset Contract</h3>
 <table>
-  <tr><th>Feature</th><th>Description</th></tr>
-  <tr><td>Age</td><td>Patient age</td></tr>
-  <tr><td>EDUC</td><td>Years of education</td></tr>
-  <tr><td>SES</td><td>Socioeconomic score</td></tr>
-  <tr><td>MMSE</td><td>Cognitive screening score</td></tr>
-  <tr><td>CDR</td><td>Clinical dementia rating</td></tr>
-  <tr><td>eTIV</td><td>Estimated total intracranial volume</td></tr>
-  <tr><td>nWBV</td><td>Normalized whole brain volume</td></tr>
-  <tr><td>ASF</td><td>Atlas scaling factor</td></tr>
+  <tr><th>Field</th><th>Value</th></tr>
+  <tr><td>File</td><td><code>oasis_longitudinal.csv</code></td></tr>
+  <tr><td>Task</td><td>Demented vs Nondemented classification</td></tr>
+  <tr><td>Dropped class</td><td>Converted</td></tr>
+  <tr><td>Features</td><td>Age, EDUC, SES, MMSE, CDR, eTIV, nWBV, ASF</td></tr>
+  <tr><td>Missing data handling</td><td>Drop rows with null values in selected columns</td></tr>
 </table>
 
-<h3>Target and Filtering</h3>
-<ul>
-  <li>Target column: Group</li>
-  <li>Excluded class: Converted</li>
-  <li>Kept classes: Demented and Nondemented</li>
-  <li>Missing rows dropped for selected features plus target</li>
-</ul>
-
-<h3>Model</h3>
+<h3>Training Settings</h3>
 <table>
   <tr><th>Property</th><th>Value</th></tr>
-  <tr><td>Algorithm</td><td>RandomForestClassifier</td></tr>
-  <tr><td>Trees</td><td>100</td></tr>
-  <tr><td>Random Seed</td><td>42</td></tr>
-  <tr><td>Split</td><td>80 percent train, 20 percent test</td></tr>
-  <tr><td>Artifacts</td><td>model.pkl and label_encoder.pkl</td></tr>
+  <tr><td>Estimator</td><td>RandomForestClassifier</td></tr>
+  <tr><td>n_estimators</td><td>100</td></tr>
+  <tr><td>Train/Test split</td><td>80 / 20</td></tr>
+  <tr><td>random_state</td><td>42</td></tr>
+  <tr><td>Outputs</td><td><code>model.pkl</code>, <code>label_encoder.pkl</code></td></tr>
 </table>
 
-<h1 id="runtime">5. Runtime Flow and API</h1>
+<h1 id="flow">5. Request Flow Sequence</h1>
 <div class="mermaid-container">
-  <h3>Prediction Request Sequence</h3>
+  <h3>Prediction Flow</h3>
   <div class="mermaid">
 sequenceDiagram
-  participant B as Browser
-  participant F as FastAPI
-  participant M as RandomForest Model
-  B->>F: POST /predict with 8 features
-  F->>F: Validate payload with Pydantic
-  F->>F: Build DataFrame with canonical feature names
-  F->>M: predict and predict_proba
-  M-->>F: class id and probabilities
-  F->>F: label decode and confidence percent
-  F-->>B: prediction and confidence
+  participant U as User
+  participant H as index.html
+  participant F as FastAPI /predict
+  participant M as RandomForest
+  U->>H: Enter 8 feature values
+  H->>F: POST JSON payload
+  F->>F: Validate schema and build DataFrame
+  F->>M: predict + predict_proba
+  M-->>F: class index + probabilities
+  F->>F: inverse label decode
+  F-->>H: prediction + confidence
+  H-->>U: Render result block
   </div>
 </div>
 
-<h3>API Endpoints</h3>
+<h1 id="files">6. Every Key File Explained</h1>
 <table>
-  <tr><th>Method</th><th>Path</th><th>Description</th></tr>
-  <tr><td>GET</td><td>/</td><td>Health style status response</td></tr>
-  <tr><td>POST</td><td>/predict</td><td>Returns predicted label and confidence percent</td></tr>
+  <tr><th>File</th><th>Lines</th><th>What it does</th></tr>
+  <tr><td><code>main.py</code></td><td>58</td><td>FastAPI app, CORS config, request model, root endpoint, prediction endpoint</td></tr>
+  <tr><td><code>train.py</code></td><td>37</td><td>Load data, filter classes, train model, print report, save artifacts</td></tr>
+  <tr><td><code>explore.py</code></td><td>9</td><td>Dataset shape/head/columns/nulls/class counts</td></tr>
+  <tr><td><code>index.html</code></td><td>85</td><td>Web form and fetch integration to backend endpoint</td></tr>
+  <tr><td><code>app.py</code></td><td>36</td><td>Gradio wrapper around the same model artifacts</td></tr>
+  <tr><td><code>run_local.sh</code></td><td>65</td><td>Install deps, explore, train, smoke test, optional server startup</td></tr>
+  <tr><td><code>test_payloads.json</code></td><td>generated</td><td>24 real examples with expected labels for bulk validation</td></tr>
+  <tr><td><code>test_payloads.ndjson</code></td><td>generated</td><td>Line-delimited form for scripting pipelines</td></tr>
 </table>
 
-<h3>Sample Predict Payload</h3>
+<h1 id="api">7. API Reference</h1>
+<table>
+  <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Purpose</th></tr>
+  <tr><td>GET</td><td><code>/</code></td><td>No</td><td>Service health indicator</td></tr>
+  <tr><td>POST</td><td><code>/predict</code></td><td>No</td><td>Predict class and confidence from feature payload</td></tr>
+</table>
+
+<h3>Example Request</h3>
 <pre>{
   "age": 75,
   "educ": 12,
@@ -306,95 +277,80 @@ sequenceDiagram
   "asf": 1.2
 }</pre>
 
-<h1 id="files">6. Key Files Explained</h1>
+<h3>Example Response</h3>
+<pre>{
+  "prediction": "Demented",
+  "confidence": 100.0
+}</pre>
+
+<h1 id="testing">8. Testing Matrix</h1>
 <table>
-  <tr><th>File</th><th>Lines</th><th>Role</th></tr>
-  <tr><td>main.py</td><td>58</td><td>FastAPI inference service with request schema and prediction route</td></tr>
-  <tr><td>train.py</td><td>37</td><td>Model training and artifact export pipeline</td></tr>
-  <tr><td>explore.py</td><td>9</td><td>Quick dataset quality and structure inspection</td></tr>
-  <tr><td>index.html</td><td>85</td><td>Manual feature input UI with fetch call to backend</td></tr>
-  <tr><td>app.py</td><td>36</td><td>Gradio app for free cloud-hosted demonstration</td></tr>
-  <tr><td>run_local.sh</td><td>65</td><td>One-command setup, train, smoke test, and optional server launch</td></tr>
-  <tr><td>requirements.txt</td><td>7</td><td>Minimal runtime dependencies</td></tr>
-  <tr><td>test_payloads.json</td><td>Generated</td><td>24 real API test payloads with expected labels</td></tr>
+  <tr><th>Test Type</th><th>Method</th><th>Status</th></tr>
+  <tr><td>Local flow test</td><td><code>./run_local.sh</code></td><td>Pass</td></tr>
+  <tr><td>API smoke test</td><td>FastAPI TestClient in script</td><td>Pass</td></tr>
+  <tr><td>Bulk payload validation</td><td>24 real payload set</td><td>23/24 match (95.83 percent)</td></tr>
+  <tr><td>Repository test suite</td><td><code>pytest -q</code></td><td>Pass</td></tr>
 </table>
 
-<h1 id="testing">7. Testing and Validation</h1>
-<h3>Validation Modes</h3>
-<ul>
-  <li>Model report at training time using classification report</li>
-  <li>In-process API smoke test using FastAPI TestClient</li>
-  <li>Manual API tests from browser docs</li>
-  <li>Bulk test payload run with expected label comparison</li>
-</ul>
+<h1 id="ops">9. Deployment and Run Guide</h1>
+<h3>One-command local run</h3>
+<pre><code>./run_local.sh</code></pre>
 
-<h3>Bulk Payload Result</h3>
-<div class="info-box">
-Generated payload count: 24 cases from real OASIS rows. Expected label match in recent run: 23 out of 24, equal to 95.83 percent.
-</div>
+<h3>No-serve mode</h3>
+<pre><code>./run_local.sh --no-serve</code></pre>
 
-<h1 id="ops">8. Operations Guide</h1>
-<h3>One Command Run</h3>
-<pre>./run_local.sh</pre>
-
-<h3>No server mode</h3>
-<pre>./run_local.sh --no-serve</pre>
-
-<h3>Manual command path</h3>
-<pre>pip install -r requirements.txt
+<h3>Manual mode</h3>
+<pre><code>pip install -r requirements.txt
 python explore.py
 python train.py
-uvicorn main:app --reload</pre>
+uvicorn main:app --reload</code></pre>
 
-<h1 id="compare">9. Original vs Current Comparison</h1>
+<h1 id="compare">10. Original vs Current</h1>
 <table>
-  <tr><th>Dimension</th><th>Original Orientation</th><th>Current Practical State</th></tr>
-  <tr><td>Scope</td><td>Multimodal enterprise platform</td><td>Focused binary prediction pipeline</td></tr>
-  <tr><td>Infra dependency</td><td>High</td><td>Low</td></tr>
-  <tr><td>Time to first prediction</td><td>High setup overhead</td><td>Minutes on local machine</td></tr>
-  <tr><td>Deployment path</td><td>Cloud-first</td><td>Local plus free Gradio hosting option</td></tr>
-  <tr><td>Repository assets</td><td>Broad enterprise assets</td><td>Preserved and untouched for future</td></tr>
+  <tr><th>Dimension</th><th>Original Project Direction</th><th>Current Practical Implementation</th></tr>
+  <tr><td>Architecture scope</td><td>Broad enterprise modules and infra orientation</td><td>Focused runnable ML app pipeline</td></tr>
+  <tr><td>Operational overhead</td><td>High</td><td>Low</td></tr>
+  <tr><td>Time to value</td><td>Long setup cycle</td><td>Short run cycle</td></tr>
+  <tr><td>Assets retained</td><td>Terraform, Helm, CI, scripts, src modules</td><td>Fully retained for phased return</td></tr>
 </table>
 
-<h1 id="roadmap">10. Slow Migration Back to Advanced Vision</h1>
+<h1 id="roadmap">11. Roadmap to Advanced NeuroSynth</h1>
 <div class="mermaid-container">
   <h3>Phased Progression</h3>
   <div class="mermaid">
 graph TD
-  P1[Phase 1 Baseline Reliability] --> P2[Phase 2 MLOps Midpoint]
-  P2 --> P3[Phase 3 Module Reintegration]
-  P3 --> P4[Phase 4 Enterprise Rollout]
+  P1[Phase 1 Baseline hardening] --> P2[Phase 2 MLOps midpoint]
+  P2 --> P3[Phase 3 selective module reintegration]
+  P3 --> P4[Phase 4 production controls and rollout]
   </div>
 </div>
 
 <table>
   <tr><th>Phase</th><th>Focus</th><th>Exit Criteria</th></tr>
-  <tr><td>Phase 1</td><td>Input validation, logging, reproducibility artifacts</td><td>Stable and repeatable local pipeline</td></tr>
-  <tr><td>Phase 2</td><td>Container profile, staged checks, experiment tracking</td><td>Predictable staging deployments</td></tr>
-  <tr><td>Phase 3</td><td>Selective reintroduction of advanced src modules</td><td>Multimodal components operating with tests</td></tr>
-  <tr><td>Phase 4</td><td>Infra-backed deployment with secret management and monitoring</td><td>Production controls and rollback readiness</td></tr>
+  <tr><td>Phase 1</td><td>Validation, logging, reproducibility</td><td>Stable local operation and repeatable outputs</td></tr>
+  <tr><td>Phase 2</td><td>Containerized baseline, staged checks</td><td>Reliable pre-prod pipeline</td></tr>
+  <tr><td>Phase 3</td><td>Re-enable selected advanced modules</td><td>Expanded capability with passing tests</td></tr>
+  <tr><td>Phase 4</td><td>Infra-backed deployment controls</td><td>Monitored, rollback-ready production path</td></tr>
 </table>
 
 <div class="section-break"></div>
-<h1 id="appendix">11. Appendix</h1>
-<h2>Repository Snapshot Metrics</h2>
+<h1 id="appendix">12. Appendix and Metrics</h1>
+<div class="stat-grid">
+  <div class="stat-card"><div class="num">68</div><div class="label">Root Scope Files</div></div>
+  <div class="stat-card"><div class="num">247</div><div class="label">Files Under src</div></div>
+  <div class="stat-card"><div class="num">102</div><div class="label">Files Under tests</div></div>
+  <div class="stat-card"><div class="num">3</div><div class="label">Files Under scripts</div></div>
+</div>
+
 <table>
-  <tr><th>Metric</th><th>Value</th></tr>
-  <tr><td>Root and near-root files counted</td><td>68</td></tr>
-  <tr><td>Files under src</td><td>247</td></tr>
-  <tr><td>Files under tests</td><td>102</td></tr>
-  <tr><td>Files under scripts</td><td>3</td></tr>
+  <tr><th>Documentation Artifacts</th><th>Path</th></tr>
+  <tr><td>HTML report</td><td><code>docs/NeuroSynth_Complete_Documentation.html</code></td></tr>
+  <tr><td>PDF report</td><td><code>docs/NeuroSynth_Complete_Documentation.pdf</code></td></tr>
 </table>
 
-<h2>Generated Documentation Files</h2>
-<ul>
-  <li>docs/NeuroSynth_Complete_Documentation.html</li>
-  <li>docs/NeuroSynth_Complete_Documentation.pdf</li>
-</ul>
-
 <footer>
-  <p>NeuroSynth Complete Documentation</p>
-  <p>Generated in April 2026 for final handoff and reporting</p>
+  <p>NeuroSynth Complete System Documentation</p>
+  <p>Generated in April 2026</p>
 </footer>
 
 <script>
@@ -407,5 +363,6 @@ graph TD
     er: { useMaxWidth: true, fontSize: 10 }
   });
 </script>
+
 </body>
 </html>
