@@ -135,7 +135,21 @@ class ConnectomeBuilder:
         return np.stack([av45, av1451], axis=1)
 
     def _zscore_clip(self, features: np.ndarray) -> np.ndarray:
-        normed = (features - self._mean) / self._std
+        mean = self._mean
+        std = self._std
+        if mean.ndim != 1:
+            mean = mean.reshape(-1)
+        if std.ndim != 1:
+            std = std.reshape(-1)
+        if mean.shape[0] != features.shape[1]:
+            if mean.shape[0] > features.shape[1]:
+                mean = mean[: features.shape[1]]
+                std = std[: features.shape[1]]
+            else:
+                pad = features.shape[1] - mean.shape[0]
+                mean = np.concatenate([mean, np.zeros(pad, dtype=np.float32)])
+                std = np.concatenate([std, np.ones(pad, dtype=np.float32)])
+        normed = (features - mean) / std
         normed = np.clip(normed, -5.0, 5.0)
         return normed
 

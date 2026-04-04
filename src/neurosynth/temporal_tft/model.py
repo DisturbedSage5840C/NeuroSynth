@@ -32,9 +32,19 @@ class NeuroTFT:
     def _enforce_progressive(self, median: np.ndarray) -> np.ndarray:
         return np.maximum.accumulate(median, axis=-1)
 
+    @staticmethod
+    def _to_numpy(x):
+        if hasattr(x, "detach"):
+            x = x.detach()
+        if hasattr(x, "cpu"):
+            x = x.cpu()
+        if hasattr(x, "numpy"):
+            return x.numpy()
+        return np.asarray(x)
+
     def predict_with_uncertainty(self, patient_df: pd.DataFrame) -> dict:
         raw, x = self.model.predict(patient_df, mode="raw", return_x=True)
-        pred = raw["prediction"].detach().cpu().numpy()
+        pred = self._to_numpy(raw["prediction"])
         # shape expected: [B, decoder_length, quantiles]
         q_map = {q: i for i, q in enumerate(self.quantiles)}
 
@@ -53,7 +63,11 @@ class NeuroTFT:
             variable_importances = pd.DataFrame({"variable": list(var_imp.keys()), "importance": [float(np.mean(v)) for v in var_imp.values()]})
 
         att = raw.get("attention")
-        enc_att = att[0].detach().cpu().numpy() if att is not None else np.zeros((8, 6), dtype=np.float32)
+        if att is None:
+            enc_att = np.zeros((8, 6), dtype=np.float32)
+        else:
+            att_np = self._to_numpy(att)
+            enc_att = att_np[0] if att_np.ndim >= 3 else att_np
 
         thr = 60.0
         above = np.where(median > thr)[0]

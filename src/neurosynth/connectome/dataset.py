@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 import torch
+from sklearn.model_selection import GroupKFold
 from sklearn.model_selection import StratifiedGroupKFold
 from torch_geometric.data import Batch, Data, InMemoryDataset
 
@@ -156,9 +157,23 @@ def make_stratified_group_splits(
     y = patient_frame["label_stage"].astype(str) + "::" + patient_frame["site_id"].astype(str)
     groups = patient_frame["patient_id"].astype(str)
 
-    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+    min_class_count = int(pd.Series(y).value_counts().min()) if len(y) else 0
+    effective_splits = min(n_splits, len(patient_frame))
     out: list[tuple[list[str], list[str]]] = []
-    for train_idx, val_idx in splitter.split(patient_frame, y, groups=groups):
+
+    if min_class_count >= 2 and effective_splits >= 2:
+        splitter = StratifiedGroupKFold(n_splits=min(effective_splits, min_class_count), shuffle=True, random_state=random_state)
+        for train_idx, val_idx in splitter.split(patient_frame, y, groups=groups):
+            train_ids = patient_frame.iloc[train_idx]["patient_id"].astype(str).tolist()
+            val_ids = patient_frame.iloc[val_idx]["patient_id"].astype(str).tolist()
+            out.append((train_ids, val_ids))
+        return out
+
+    if effective_splits < 2:
+        return [(groups.tolist(), [])]
+
+    splitter = GroupKFold(n_splits=effective_splits)
+    for train_idx, val_idx in splitter.split(patient_frame, groups=groups):
         train_ids = patient_frame.iloc[train_idx]["patient_id"].astype(str).tolist()
         val_ids = patient_frame.iloc[val_idx]["patient_id"].astype(str).tolist()
         out.append((train_ids, val_ids))

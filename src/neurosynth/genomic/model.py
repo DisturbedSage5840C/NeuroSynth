@@ -181,7 +181,7 @@ class HierarchicalVariantTransformer(nn.Module):
             patient = self.apoe_fuse(torch.cat([patient, apoe_emb], dim=-1))
 
             patient_embeddings.append(patient)
-            gene_attentions.append(torch.stack(gene_attn).mean(dim=0))
+            gene_attentions.append(torch.mean(torch.stack([a.mean(dim=(-1, -2)) for a in gene_attn]), dim=0))
             variant_importance.append(torch.cat(var_scores) if var_scores else torch.zeros(1, device=g_emb.device))
 
         z = torch.stack(patient_embeddings, dim=0)

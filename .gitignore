@@ -1,10 +1,12 @@
 .venv/
+.venv*/
 .pytest_cache/
 __pycache__/
 *.py[cod]
 *.so
 *.egg-info/
 .coverage
+.coverage.*
 htmlcov/
 .DS_Store
 .env

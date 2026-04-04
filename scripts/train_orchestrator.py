@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -24,9 +25,9 @@ def main() -> int:
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
 
     steps = [
-        ["python", "-m", "neurosynth.connectome.train", "--help"],
-        ["python", "-m", "neurosynth.genomic.train", "--help"],
-        ["python", "-m", "neurosynth.temporal_tft.train", "--help"],
+        [sys.executable, "-m", "neurosynth.connectome.train", "--help"],
+        [sys.executable, "-m", "neurosynth.genomic.train", "--help"],
+        [sys.executable, "-m", "neurosynth.temporal_tft.train", "--help"],
     ]
 
     summary = {"dry_run": args.dry_run, "steps": []}

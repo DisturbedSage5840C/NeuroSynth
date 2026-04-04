@@ -80,6 +80,10 @@ python scripts/train_orchestrator.py --dry-run
 
 The orchestrator writes a structured summary to artifacts/train_orchestrator_summary.json.
 
+To generate a publishable artifact manifest after training:
+
+python scripts/publish_model_artifacts.py --model-dir /path/to/model_outputs
+
 ## Release Gate
 
 Before public deployment, run the release gate:
@@ -91,6 +95,17 @@ This checks:
 - Source compilation integrity
 - Placeholder and hardcoded test-value leakage
 - Required runtime environment variables for auth and orchestration
+
+## Production Contracts
+
+Provide production values before deployment:
+
+- Environment variables: .env.prod.example
+- Terraform values: terraform/prod.tfvars.example
+
+## CI Coverage
+
+The deployment workflow validates Python 3.11 and 3.12, runs unit tests, release gate checks, security scans, and integration tests prior to promotion.
 
 ## Current State
 

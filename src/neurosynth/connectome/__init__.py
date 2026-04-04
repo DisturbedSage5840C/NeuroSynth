@@ -1,14 +1,30 @@
-from neurosynth.connectome.builder import ConnectomeBuilder
-from neurosynth.connectome.dataset import (
-    TemporalBrainDataset,
-    TemporalLengthBatchSampler,
-    collate_temporal_batch,
-    make_stratified_group_splits,
-)
-from neurosynth.connectome.explain import ConnectomeExplainer, ExplanationResult
-from neurosynth.connectome.losses import CombinedNeuroLoss, EvidentialClassificationLoss, NIGLoss
-from neurosynth.connectome.model import BrainConnectomeGNN
-from neurosynth.connectome.trainer import NeuroGNNTrainer
+from importlib import import_module
+
+
+_LAZY_EXPORTS = {
+    "ConnectomeBuilder": ("neurosynth.connectome.builder", "ConnectomeBuilder"),
+    "TemporalBrainDataset": ("neurosynth.connectome.dataset", "TemporalBrainDataset"),
+    "TemporalLengthBatchSampler": ("neurosynth.connectome.dataset", "TemporalLengthBatchSampler"),
+    "collate_temporal_batch": ("neurosynth.connectome.dataset", "collate_temporal_batch"),
+    "make_stratified_group_splits": ("neurosynth.connectome.dataset", "make_stratified_group_splits"),
+    "BrainConnectomeGNN": ("neurosynth.connectome.model", "BrainConnectomeGNN"),
+    "CombinedNeuroLoss": ("neurosynth.connectome.losses", "CombinedNeuroLoss"),
+    "EvidentialClassificationLoss": ("neurosynth.connectome.losses", "EvidentialClassificationLoss"),
+    "NIGLoss": ("neurosynth.connectome.losses", "NIGLoss"),
+    "NeuroGNNTrainer": ("neurosynth.connectome.trainer", "NeuroGNNTrainer"),
+    "ConnectomeExplainer": ("neurosynth.connectome.explain", "ConnectomeExplainer"),
+    "ExplanationResult": ("neurosynth.connectome.explain", "ExplanationResult"),
+}
+
+
+def __getattr__(name: str):
+    if name not in _LAZY_EXPORTS:
+        raise AttributeError(f"module 'neurosynth.connectome' has no attribute {name!r}")
+    module_name, symbol = _LAZY_EXPORTS[name]
+    module = import_module(module_name)
+    value = getattr(module, symbol)
+    globals()[name] = value
+    return value
 
 __all__ = [
     "ConnectomeBuilder",

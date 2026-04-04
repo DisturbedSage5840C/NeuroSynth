@@ -12,10 +12,20 @@ from neurosynth.temporal_tft.types import CalibratedTFT, ValidationReport
 
 
 class TFTCalibrator:
+    @staticmethod
+    def _to_numpy(x):
+        if hasattr(x, "detach"):
+            x = x.detach()
+        if hasattr(x, "cpu"):
+            x = x.cpu()
+        if hasattr(x, "numpy"):
+            return x.numpy()
+        return np.asarray(x)
+
     def calibrate_quantiles(self, model, val_loader) -> CalibratedTFT:
         raw = model.predict(val_loader, mode="raw")
-        pred = raw["prediction"].detach().cpu().numpy()
-        y = raw["target_scale"][..., 0].detach().cpu().numpy() if "target_scale" in raw else pred[:, :, 3]
+        pred = self._to_numpy(raw["prediction"])
+        y = self._to_numpy(raw["target_scale"])[..., 0] if "target_scale" in raw else pred[:, :, 3]
 
         quantiles = [0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95]
         calibrators: dict[float, IsotonicRegression] = {}
@@ -38,6 +48,16 @@ class TFTCalibrator:
 
 
 class TFTValidator:
+    @staticmethod
+    def _to_numpy(x):
+        if hasattr(x, "detach"):
+            x = x.detach()
+        if hasattr(x, "cpu"):
+            x = x.cpu()
+        if hasattr(x, "numpy"):
+            return x.numpy()
+        return np.asarray(x)
+
     def _interval_metrics(self, y_true: np.ndarray, lo: np.ndarray, hi: np.ndarray, alpha: float) -> dict[str, float]:
         cover = np.mean((y_true >= lo) & (y_true <= hi))
         width = np.mean(hi - lo)
@@ -46,8 +66,8 @@ class TFTValidator:
 
     def comprehensive_validation(self, model, test_loader) -> ValidationReport:
         raw = model.predict(test_loader, mode="raw")
-        pred = raw["prediction"].detach().cpu().numpy()
-        y = raw["target_scale"][..., 0].detach().cpu().numpy() if "target_scale" in raw else pred[:, :, 3]
+        pred = self._to_numpy(raw["prediction"])
+        y = self._to_numpy(raw["target_scale"])[..., 0] if "target_scale" in raw else pred[:, :, 3]
 
         horizons = [1, 2, 3, 4]
         per_h = []

@@ -8,13 +8,23 @@ on:
 jobs:
   test-build-scan:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
       - run: pip install -e '.[test]'
       - run: pytest -q
+      - name: Release gate
+        env:
+          NEURO_JWKS_URL: https://auth.example.local/.well-known/jwks.json
+          NEURO_ALLOWED_ORIGINS: https://api.example.local
+          NEURO_REDIS_URL: redis://localhost:6379/0
+        run: python scripts/release_gate.py
       - name: Build image
         run: docker build -t neurosynth:${{ github.sha }} .
       - name: Trivy scan
@@ -45,12 +55,12 @@ jobs:
       - name: Deploy staging
         run: helm upgrade --install neurosynth helm/neurosynth -f helm/neurosynth/values.yaml
       - name: Integration tests
+        env:
+          NEURO_JWKS_URL: https://auth.example.local/.well-known/jwks.json
+          NEURO_ALLOWED_ORIGINS: https://api.example.local
+          NEURO_REDIS_URL: redis://localhost:6379/0
         run: |
-          if [ -d tests/integration ]; then
-            pytest -q tests/integration
-          else
-            echo "No integration tests directory found; skipping integration phase."
-          fi
+          pytest -q tests/integration
 
   promote-prod:
     needs: push-ecr-deploy-staging
