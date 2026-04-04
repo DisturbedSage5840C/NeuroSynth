@@ -37,35 +37,52 @@ jobs:
 
   push-ecr-deploy-staging:
     needs: test-build-scan
-    if: ${{ secrets.AWS_GHA_ROLE_ARN != '' && secrets.ECR_REPOSITORY != '' }}
     runs-on: ubuntu-latest
+    outputs:
+      deploy_ready: ${{ steps.prereq.outputs.ready }}
     steps:
       - uses: actions/checkout@v4
+      - name: Check deploy prerequisites
+        id: prereq
+        run: |
+          if [ -z "${{ secrets.AWS_GHA_ROLE_ARN }}" ] || [ -z "${{ secrets.ECR_REPOSITORY }}" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Configure AWS
+        if: ${{ steps.prereq.outputs.ready == 'true' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_GHA_ROLE_ARN }}
           aws-region: us-east-1
       - name: Login ECR
+        if: ${{ steps.prereq.outputs.ready == 'true' }}
         uses: aws-actions/amazon-ecr-login@v2
-      - run: |
+      - if: ${{ steps.prereq.outputs.ready == 'true' }}
+        run: |
           docker build -t $ECR_REPO:staging-${{ github.sha }} .
           docker push $ECR_REPO:staging-${{ github.sha }}
         env:
           ECR_REPO: ${{ secrets.ECR_REPOSITORY }}
       - name: Deploy staging
+        if: ${{ steps.prereq.outputs.ready == 'true' }}
         run: helm upgrade --install neurosynth helm/neurosynth -f helm/neurosynth/values.yaml
       - name: Integration tests
+        if: ${{ steps.prereq.outputs.ready == 'true' }}
         env:
           NEURO_JWKS_URL: https://auth.example.local/.well-known/jwks.json
           NEURO_ALLOWED_ORIGINS: https://api.example.local
           NEURO_REDIS_URL: redis://localhost:6379/0
         run: |
           pytest -q tests/integration
+      - name: Skip deploy when secrets absent
+        if: ${{ steps.prereq.outputs.ready != 'true' }}
+        run: echo "Skipping deploy: AWS_GHA_ROLE_ARN/ECR_REPOSITORY secrets are not configured."
 
   promote-prod:
     needs: push-ecr-deploy-staging
-    if: ${{ needs.push-ecr-deploy-staging.result == 'success' }}
+    if: ${{ needs.push-ecr-deploy-staging.result == 'success' && needs.push-ecr-deploy-staging.outputs.deploy_ready == 'true' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
