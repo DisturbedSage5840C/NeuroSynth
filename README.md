@@ -1,116 +1,131 @@
 # NeuroSynth
 
-NeuroSynth is a multi-modal neurological intelligence platform for forecasting deterioration, surfacing causal drivers, and generating clinically structured intervention reports.
+<p align="center">
+  Multi-modal neurological intelligence for prediction, causality, and clinical report generation.
+</p>
 
-It combines imaging, longitudinal biomarkers, genomics, causal discovery, and medical language generation into one production-oriented system.
+<p align="center">
+  Imaging + Genomics + Longitudinal Biomarkers + Causal Discovery + Clinical LLMs
+</p>
 
-## Why NeuroSynth
+---
 
-- Predicts neurological progression from heterogeneous patient signals.
-- Connects prediction to causal mechanism, not only correlation.
-- Produces explainable, uncertainty-aware outputs for clinical workflows.
-- Ships with end-to-end infrastructure scaffolding across data, modeling, and deployment.
+## What This Is
 
-## Platform Modules
+NeuroSynth is a production-oriented platform that fuses neuroimaging, wearable streams, genomics, and temporal clinical data to:
 
-- Phase 1: Data Lakehouse and Ingestion
-   - ADNI, PPMI, MIMIC, and wearable stream connectors
-   - DICOM processing pipeline
-   - Apache Iceberg tables for patient, longitudinal biomarker, imaging index, and genomics domains
-   - Neo4j knowledge graph loader
-   - TimescaleDB stream feature processing
+1. Forecast patient deterioration trajectories
+2. Surface likely causal pathways behind risk progression
+3. Generate schema-constrained, clinically structured intervention reports
 
-- Phase 2: Brain Connectome GNN
-   - Connectome construction from fMRI and structural data
-   - Temporal graph datasets
-   - GATv2 plus ODE-LSTM architecture
-   - Evidential uncertainty and explainability utilities
+It is designed as an end-to-end system, not a single model repo.
 
-- Phase 3: Genomic Transformer
-   - QC and annotation wrappers for genomic preprocessing
-   - DNABERT-based sequence context encoding
-   - Hierarchical variant modeling and risk scoring
+## Why It Matters
 
-- Phase 4: Temporal Fusion Transformer
-   - Longitudinal biomarker preprocessing and dataset factory
-   - TFT wrapper, calibration, validation, and variable importance analysis
+- Multi-modal by design: one platform across imaging, genomics, biomarkers, and language
+- Clinically actionable: uncertainty-aware predictions and explainable outputs
+- Causality-aware: counterfactual and intervention simulation support
+- Deployment-ready: CI/CD, infra templates, security scanning, release contracts
 
-- Phase 5: Neural Causal Discovery
-   - NOTEARS-inspired differentiable DAG learning
-   - Patient-specific causal fine-tuning
-   - Counterfactual intervention simulation and validation
+## Architecture At A Glance
 
-- Phase 6: Clinical LLM
-   - Corpus tooling, training stages, schema-constrained report generation
-   - Retrieval pipeline and hallucination controls
+### Phase 1. Data + Lakehouse
+- ADNI, PPMI, MIMIC, and wearable connectors
+- DICOM processing and normalized table pipelines
+- Apache Iceberg domain tables
+- Knowledge graph and timeseries feature processing
 
-- Phase 7: MLOps and Deployment
-   - FastAPI orchestration layer
-   - Kubeflow pipeline definitions
-   - Helm chart and Terraform infrastructure modules
-   - Monitoring, drift hooks, and CI deployment flow
+### Phase 2. Brain Connectome Modeling
+- fMRI and structural feature graph construction
+- Temporal graph batches and sequence datasets
+- GNN training scaffolding with uncertainty hooks
 
-## Repository Layout
+### Phase 3. Genomic Intelligence
+- Genomic preprocessing and annotation pathways
+- Hierarchical variant transformer components
+- Risk scoring and multi-head prediction outputs
 
-- src/neurosynth: core platform packages
-- tests: unit and integration-oriented tests
-- helm/neurosynth: Kubernetes chart templates and values
-- terraform: AWS infrastructure modules
-- .github/workflows: CI and deployment workflows
-- loadtest: Locust performance workload definitions
+### Phase 4. Temporal Forecasting
+- Longitudinal biomarker dataset factory
+- TFT wrapper, calibration, and validation modules
+- Progression forecasting with interval outputs
+
+### Phase 5. Causal Engine
+- Differentiable causal discovery workflows
+- Patient-level causal analysis and counterfactual simulation
+
+### Phase 6. Clinical LLM Stack
+- Corpus preparation and staged training utilities
+- Retrieval and schema-constrained report generation
+
+### Phase 7. MLOps + Deployment
+- FastAPI orchestration and Kubeflow integration
+- Helm and Terraform deployment templates
+- CI pipeline with tests, release gating, and security scanning
+
+## Repository Map
+
+- src/neurosynth: platform source modules
+- tests: unit and integration tests
+- scripts: operational and release scripts
+- artifacts: generated summaries and manifests
+- helm/neurosynth: chart templates and values
+- terraform: infra modules and production var templates
+- .github/workflows: CI/CD workflows
 
 ## Quick Start
 
-1. Create and activate a Python 3.11 virtual environment.
-2. Install project dependencies.
-3. Start required local services with Docker Compose.
-4. Run the test suite.
-
-Example:
-
+```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -e '.[test]'
 docker compose up -d
 pytest -q
+```
 
-## Training Workflow
+## Training + Artifact Publication
 
-Use the orchestrator to run or preview model training stages:
+Preview orchestration plan:
 
+```bash
 python scripts/train_orchestrator.py --dry-run
+```
 
-The orchestrator writes a structured summary to artifacts/train_orchestrator_summary.json.
+Run orchestration:
 
-To generate a publishable artifact manifest after training:
+```bash
+python scripts/train_orchestrator.py
+```
 
-python scripts/publish_model_artifacts.py --model-dir /path/to/model_outputs
+Publish artifact manifest:
+
+```bash
+python scripts/publish_model_artifacts.py --model-dir artifacts
+```
 
 ## Release Gate
 
-Before public deployment, run the release gate:
+Run pre-release checks:
 
+```bash
 python scripts/release_gate.py
+```
 
-This checks:
+Gate coverage includes:
 
-- Source compilation integrity
-- Placeholder and hardcoded test-value leakage
-- Required runtime environment variables for auth and orchestration
+- source compile checks
+- placeholder leakage detection
+- required runtime environment contract validation
 
-## Production Contracts
+## Production Configuration Contracts
 
-Provide production values before deployment:
+- Environment template: .env.prod.example
+- Terraform production values template: terraform/prod.tfvars.example
 
-- Environment variables: .env.prod.example
-- Terraform values: terraform/prod.tfvars.example
+## CI/CD Expectations
 
-## CI Coverage
+The pipeline validates matrix builds on Python 3.11 and 3.12, executes tests, runs release gate checks, performs security scans, and only then allows staging/prod progression.
 
-The deployment workflow validates Python 3.11 and 3.12, runs unit tests, release gate checks, security scans, and integration tests prior to promotion.
+## Status
 
-## Current State
-
-This repository contains a complete multi-phase implementation scaffold with substantial functional code across all core subsystems. Production hardening tasks are tracked and being actively tightened module by module.
-
-## Project Name
-
-NeuroSynth
+NeuroSynth is in production-hardening mode with full-stack scaffolding, active gate enforcement, and deployment pathways wired for staged promotion.
