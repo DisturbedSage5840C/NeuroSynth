@@ -7,6 +7,7 @@ from typing import AsyncGenerator, Any
 from uuid import UUID
 
 import boto3
+import numpy as np
 import pydicom
 import SimpleITK as sitk
 from pydicom.dataset import Dataset
@@ -62,9 +63,36 @@ class DICOMProcessor:
             raise DicomValidationError(f"Validation failed for {path}: {exc}") from exc
 
     def _detect_burned_in_regions(self, ds: Dataset) -> list[tuple[int, int, int, int]]:
-        # Hook for SAM2 integration; returning empty list keeps anonymization deterministic.
-        _ = ds
-        return []
+        # Fallback detector: inspect image corners for high-intensity overlays
+        # often used by scanner overlays when BurnedInAnnotation=YES.
+        if not hasattr(ds, "pixel_array"):
+            return []
+
+        arr = ds.pixel_array
+        if arr.ndim > 2:
+            arr = arr[..., 0]
+        arr = arr.astype(np.float32)
+
+        h, w = arr.shape[:2]
+        hh = max(8, h // 10)
+        ww = max(8, w // 10)
+        corners = [
+            (0, 0, ww, hh),
+            (w - ww, 0, w, hh),
+            (0, h - hh, ww, h),
+            (w - ww, h - hh, w, h),
+        ]
+
+        p995 = float(np.percentile(arr, 99.5))
+        regions: list[tuple[int, int, int, int]] = []
+        for x0, y0, x1, y1 in corners:
+            patch = arr[y0:y1, x0:x1]
+            if patch.size == 0:
+                continue
+            hot_ratio = float((patch >= p995).mean())
+            if hot_ratio > 0.01:
+                regions.append((x0, y0, x1, y1))
+        return regions
 
     def anonymize_dicom(self, path: Path, patient_uuid: UUID) -> Path:
         ds = pydicom.dcmread(path, force=True)

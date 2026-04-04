@@ -4,8 +4,10 @@ metadata:
   name: {{ include "neurosynth.fullname" . }}-ingress
   annotations:
     kubernetes.io/ingress.class: {{ .Values.ingress.className }}
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/wafv2-acl-arn: arn:aws:wafv2:us-east-1:123456789012:regional/webacl/neurosynth/abcd
+    alb.ingress.kubernetes.io/scheme: {{ .Values.ingress.scheme | default "internal" }}
+    {{- if .Values.ingress.wafAclArn }}
+    alb.ingress.kubernetes.io/wafv2-acl-arn: {{ .Values.ingress.wafAclArn | quote }}
+    {{- end }}
 spec:
   rules:
   - host: {{ .Values.ingress.host }}

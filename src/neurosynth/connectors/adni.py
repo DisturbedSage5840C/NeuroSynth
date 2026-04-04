@@ -4,6 +4,7 @@ import asyncio
 import io
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 import numpy as np
 import pandas as pd
@@ -43,10 +44,47 @@ class ADNIConnector(AbstractNeuroDataSource):
     async def connect(self) -> None:
         if not self._settings.adni_sftp_host:
             raise DataIngestionError("ADNI SFTP host is not configured")
+        try:
+            import asyncssh
+
+            conn = await asyncssh.connect(
+                self._settings.adni_sftp_host,
+                username=self._settings.adni_sftp_user,
+                password=self._settings.adni_sftp_password,
+                known_hosts=None,
+            )
+            conn.close()
+        except ImportError:
+            self._logger.warning("adni.connect.asyncssh_missing", message="Install asyncssh to enable direct SFTP reads")
+        except Exception as exc:
+            raise DataIngestionError(f"Unable to connect to ADNI SFTP: {exc}") from exc
         self._logger.info("adni.connect", host=self._settings.adni_sftp_host)
 
+    async def _load_csv_sftp(self, sftp_path: str) -> pd.DataFrame:
+        try:
+            import asyncssh
+        except ImportError as exc:  # pragma: no cover
+            raise DataIngestionError("asyncssh is required for SFTP CSV loading") from exc
+
+        parsed = urlparse(sftp_path)
+        remote_path = parsed.path
+        host = parsed.hostname or self._settings.adni_sftp_host
+        username = parsed.username or self._settings.adni_sftp_user
+        password = parsed.password or self._settings.adni_sftp_password
+
+        if not host or not username:
+            raise DataIngestionError("SFTP host and username are required for ADNI reads")
+
+        async with asyncssh.connect(host, username=username, password=password, known_hosts=None) as conn:
+            async with conn.start_sftp_client() as sftp:
+                async with sftp.open(remote_path, "rb") as f:
+                    data = await f.read()
+
+        return pd.read_csv(io.BytesIO(data))
+
     async def _load_csv(self, path: str) -> pd.DataFrame:
-        # This placeholder expects local paths in tests or mounted SFTP mirrors.
+        if path.startswith("sftp://"):
+            return await self._load_csv_sftp(path)
         return await asyncio.to_thread(pd.read_csv, path)
 
     async def validate_schema(self) -> None:

@@ -3,7 +3,7 @@ global:
   environment: staging
 
 api:
-  image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/neurosynth-api:latest"
+  image: "neurosynth-api:latest"
   replicas: 2
   servicePort: 80
   containerPort: 8000
@@ -13,11 +13,11 @@ triton:
   replicas: 1
 
 llm:
-  image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/neurosynth-vllm:latest"
+  image: "neurosynth-vllm:latest"
   replicas: 1
 
 causal:
-  image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/neurosynth-causal:latest"
+  image: "neurosynth-causal:latest"
   replicas: 1
 
 redis:
@@ -27,7 +27,12 @@ redis:
 ingress:
   enabled: true
   className: alb
-  host: neurosynth.example.org
+  host: neurosynth.internal
+  scheme: internal
+  wafAclArn: ""
+
+serviceAccount:
+  irsaRoleArn: ""
 
 secrets:
   managerPath: /neurosynth/prod

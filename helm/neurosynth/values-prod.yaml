@@ -12,3 +12,8 @@ llm:
 
 ingress:
   host: api.neurosynth.health
+  scheme: internet-facing
+  wafAclArn: ""
+
+serviceAccount:
+  irsaRoleArn: ""

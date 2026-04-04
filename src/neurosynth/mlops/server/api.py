@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
 from collections import defaultdict, deque
@@ -9,7 +10,6 @@ from typing import Any
 
 import asyncpg
 import jwt
-import redis
 import structlog
 from celery import Celery
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
@@ -39,6 +39,9 @@ class AnalysisJobResponse(BaseModel):
     status: str
 
 
+REQUIRED_MODALITIES = ["imaging", "biomarker"]
+
+
 app = FastAPI(title="NeuroSynth API", version="v1")
 app.add_middleware(CORSMiddleware, allow_origins=API_ALLOWED_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")
@@ -64,6 +67,61 @@ async def startup() -> None:
             );
             """
         )
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS patient_registry (
+                patient_id TEXT PRIMARY KEY,
+                active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+            """
+        )
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS patient_data_inventory (
+                patient_id TEXT NOT NULL,
+                modality TEXT NOT NULL,
+                available BOOLEAN NOT NULL DEFAULT TRUE,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY(patient_id, modality)
+            );
+            """
+        )
+        await conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS analysis_jobs (
+                job_id TEXT PRIMARY KEY,
+                patient_id TEXT NOT NULL,
+                submitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                status TEXT NOT NULL,
+                config JSONB,
+                result JSONB
+            );
+            """
+        )
+
+
+async def _validate_patient_and_data(patient_id: str, analysis_config: dict[str, Any]) -> None:
+    if _pool is None:
+        raise HTTPException(status_code=503, detail="Database pool unavailable")
+
+    required_modalities = analysis_config.get("required_modalities", REQUIRED_MODALITIES)
+    async with _pool.acquire() as conn:
+        patient_exists = await conn.fetchval(
+            "SELECT EXISTS(SELECT 1 FROM patient_registry WHERE patient_id=$1 AND active=TRUE)",
+            patient_id,
+        )
+        if not patient_exists:
+            raise HTTPException(status_code=404, detail="Patient not found")
+
+        for modality in required_modalities:
+            available = await conn.fetchval(
+                "SELECT available FROM patient_data_inventory WHERE patient_id=$1 AND modality=$2",
+                patient_id,
+                str(modality),
+            )
+            if not available:
+                raise HTTPException(status_code=409, detail=f"Missing required modality: {modality}")
 
 
 async def _fetch_jwks() -> dict:
@@ -149,13 +207,24 @@ async def timeout_middleware(request: Request, call_next):
 @app.post("/v1/analyze/patient")
 async def analyze_patient(request: PatientAnalysisRequest, background_tasks: BackgroundTasks, api_key: dict = Depends(verify_api_key)) -> AnalysisJobResponse:
     _ = background_tasks
-    if api_key.get("role") not in ["clinician", "admin", "researcher"]:
+    if api_key.get("role") not in ["clinician", "admin"]:
         raise HTTPException(status_code=403, detail="Forbidden")
-    # Stubbed patient existence/data availability check.
+
     if not request.patient_id:
         raise HTTPException(status_code=400, detail="Invalid patient_id")
 
+    await _validate_patient_and_data(request.patient_id, request.analysis_config)
+
     task = celery_app.send_task("analyze_patient", args=[request.patient_id, request.analysis_config])
+    if _pool is not None:
+        async with _pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO analysis_jobs(job_id, patient_id, status, config) VALUES($1,$2,$3,$4) ON CONFLICT(job_id) DO UPDATE SET status=EXCLUDED.status, config=EXCLUDED.config",
+                task.id,
+                request.patient_id,
+                "queued",
+                json.dumps(request.analysis_config),
+            )
     return AnalysisJobResponse(job_id=task.id, status="queued")
 
 
@@ -163,7 +232,10 @@ async def analyze_patient(request: PatientAnalysisRequest, background_tasks: Bac
 async def analyze_status(job_id: str, api_key: dict = Depends(verify_api_key)):
     _ = api_key
     result = celery_app.AsyncResult(job_id)
-    return {"job_id": job_id, "status": result.status}
+    if _pool is not None:
+        async with _pool.acquire() as conn:
+            await conn.execute("UPDATE analysis_jobs SET status=$1 WHERE job_id=$2", result.status.lower(), job_id)
+    return {"job_id": job_id, "status": result.status.lower()}
 
 
 @app.get("/v1/analyze/result/{job_id}")
@@ -172,6 +244,14 @@ async def analyze_result(job_id: str, api_key: dict = Depends(verify_api_key)):
     result = celery_app.AsyncResult(job_id)
     if not result.ready():
         raise HTTPException(status_code=202, detail="Result not ready")
+    if _pool is not None:
+        async with _pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE analysis_jobs SET status=$1, result=$2::jsonb WHERE job_id=$3",
+                result.status.lower(),
+                json.dumps(result.result),
+                job_id,
+            )
     return {"job_id": job_id, "result": result.result}
 
 
@@ -186,7 +266,15 @@ async def simulate_intervention(payload: dict, api_key: dict = Depends(verify_ap
 async def patient_history(patient_id: str, api_key: dict = Depends(verify_api_key)):
     if api_key.get("role") == "researcher":
         raise HTTPException(status_code=403, detail="Researchers cannot access patient-level history")
-    return {"patient_id": patient_id, "history": []}
+    if _pool is None:
+        raise HTTPException(status_code=503, detail="Database pool unavailable")
+    async with _pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT job_id, submitted_at, status, result FROM analysis_jobs WHERE patient_id=$1 ORDER BY submitted_at DESC LIMIT 50",
+            patient_id,
+        )
+    history = [dict(r) for r in rows]
+    return {"patient_id": patient_id, "history": history}
 
 
 @app.get("/health")

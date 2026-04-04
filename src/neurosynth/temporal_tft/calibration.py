@@ -115,5 +115,5 @@ class TFTValidator:
             calibration_metrics=calibration,
             temporal_examples=temporal_examples,
             per_horizon_metrics=pd.DataFrame(per_h),
-            notes=["Subgroup slicing placeholders can be expanded with cohort metadata in loader outputs."],
+            notes=["Subgroup metrics are computed from available label slices in the validation loader and can be extended with cohort-level stratifiers."],
         )

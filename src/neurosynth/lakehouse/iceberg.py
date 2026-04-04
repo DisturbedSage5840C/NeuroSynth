@@ -153,7 +153,10 @@ class NeuroSynthLakehouse:
         # Upsert-like write uses overwrite on patient key then append new values.
         patient_ids = sorted({str(r.patient_id) for r in records})
         for patient_id in patient_ids:
-            table.overwrite(data, overwrite_filter=EqualTo("patient_id", UUID(patient_id)))
+            pid = UUID(patient_id)
+            mask = [str(v.as_py()) == patient_id for v in data.column("patient_id")]
+            patient_rows = data.filter(pa.array(mask))
+            table.overwrite(patient_rows, overwrite_filter=EqualTo("patient_id", pid))
 
     def read_patient_timeline(self, patient_id: UUID) -> pd.DataFrame:
         if not self._catalog:

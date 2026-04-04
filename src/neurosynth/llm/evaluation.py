@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from bert_score import score as bertscore
 from rouge_score import rouge_scorer
+from sklearn.metrics import cohen_kappa_score
 
 from neurosynth.llm.pmid_verify import PMIDVerifier
 from neurosynth.llm.schemas import ReportSchema
@@ -86,13 +87,31 @@ class NeuroLLMEvaluator:
 </View>"""
         out_path.write_text(xml, encoding="utf-8")
 
-    def geval_stub(self, reports: list[dict], human_scores: pd.DataFrame) -> dict[str, float]:
-        # Framework placeholder; actual GPT-4o judge calls are environment-dependent.
-        _ = reports
-        kappas = {}
-        for col in ["clinical_accuracy", "intervention_quality", "uncertainty_calibration", "actionability", "hallucination"]:
-            if col in human_scores.columns:
-                kappas[col] = float(human_scores[col].corr(human_scores[col], method="pearson"))
-            else:
-                kappas[col] = 0.0
+    def geval_agreement(self, reports: list[dict], human_scores: pd.DataFrame) -> dict[str, float]:
+        dimensions = ["clinical_accuracy", "intervention_quality", "uncertainty_calibration", "actionability", "hallucination"]
+        rows: list[dict[str, float]] = []
+        for report in reports:
+            geval = report.get("g_eval", {}) if isinstance(report, dict) else {}
+            row = {}
+            for dim in dimensions:
+                val = geval.get(dim)
+                row[dim] = float(val) if isinstance(val, (int, float)) else np.nan
+            rows.append(row)
+
+        geval_df = pd.DataFrame(rows)
+        kappas: dict[str, float] = {}
+        for dim in dimensions:
+            if dim not in human_scores.columns or dim not in geval_df.columns:
+                kappas[dim] = 0.0
+                continue
+
+            pair = pd.DataFrame({"human": human_scores[dim], "model": geval_df[dim]}).dropna()
+            if pair.empty:
+                kappas[dim] = 0.0
+                continue
+
+            human_rounded = pair["human"].round().clip(1, 5).astype(int)
+            model_rounded = pair["model"].round().clip(1, 5).astype(int)
+            kappas[dim] = float(cohen_kappa_score(human_rounded, model_rounded, weights="quadratic"))
+
         return kappas
