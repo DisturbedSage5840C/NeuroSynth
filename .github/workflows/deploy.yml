@@ -37,6 +37,7 @@ jobs:
 
   push-ecr-deploy-staging:
     needs: test-build-scan
+    if: ${{ secrets.AWS_GHA_ROLE_ARN != '' && secrets.ECR_REPOSITORY != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,6 +65,7 @@ jobs:
 
   promote-prod:
     needs: push-ecr-deploy-staging
+    if: ${{ needs.push-ecr-deploy-staging.result == 'success' }}
     runs-on: ubuntu-latest
     environment: production
     steps:
