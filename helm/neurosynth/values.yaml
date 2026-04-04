@@ -1,0 +1,42 @@
+global:
+  imagePullPolicy: IfNotPresent
+  environment: staging
+
+api:
+  image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/neurosynth-api:latest"
+  replicas: 2
+  servicePort: 80
+  containerPort: 8000
+
+triton:
+  image: "nvcr.io/nvidia/tritonserver:24.04-py3"
+  replicas: 1
+
+llm:
+  image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/neurosynth-vllm:latest"
+  replicas: 1
+
+causal:
+  image: "123456789012.dkr.ecr.us-east-1.amazonaws.com/neurosynth-causal:latest"
+  replicas: 1
+
+redis:
+  image: redis:7
+  size: 20Gi
+
+ingress:
+  enabled: true
+  className: alb
+  host: neurosynth.example.org
+
+secrets:
+  managerPath: /neurosynth/prod
+
+gpuResources:
+  requests:
+    nvidia.com/gpu: "2"
+    memory: "60Gi"
+    cpu: "8"
+  limits:
+    nvidia.com/gpu: "2"
+    memory: "64Gi"

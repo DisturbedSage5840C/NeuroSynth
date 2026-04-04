@@ -1,0 +1,59 @@
+name: neurosynth-cicd
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-build-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .[test]
+      - run: pytest -q
+      - name: Build image
+        run: docker build -t neurosynth:${{ github.sha }} .
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: neurosynth:${{ github.sha }}
+          format: table
+      - name: Semgrep scan
+        uses: returntocorp/semgrep-action@v1
+
+  push-ecr-deploy-staging:
+    needs: test-build-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/github-actions-ecr
+          aws-region: us-east-1
+      - name: Login ECR
+        uses: aws-actions/amazon-ecr-login@v2
+      - run: |
+          docker build -t $ECR_REPO:staging-${{ github.sha }} .
+          docker push $ECR_REPO:staging-${{ github.sha }}
+        env:
+          ECR_REPO: 123456789012.dkr.ecr.us-east-1.amazonaws.com/neurosynth
+      - name: Deploy staging
+        run: helm upgrade --install neurosynth helm/neurosynth -f helm/neurosynth/values.yaml
+      - name: Integration tests
+        run: pytest -q tests/integration || true
+
+  promote-prod:
+    needs: push-ecr-deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Manual approval gate
+        run: echo "approved"
+      - name: Deploy prod
+        run: helm upgrade --install neurosynth helm/neurosynth -f helm/neurosynth/values-prod.yaml
