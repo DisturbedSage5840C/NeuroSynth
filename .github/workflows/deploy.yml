@@ -38,14 +38,15 @@ jobs:
   push-ecr-deploy-staging:
     needs: test-build-scan
     runs-on: ubuntu-latest
-    outputs:
-      deploy_ready: ${{ steps.prereq.outputs.ready }}
     steps:
       - uses: actions/checkout@v4
       - name: Check deploy prerequisites
         id: prereq
+        env:
+          AWS_GHA_ROLE_ARN: ${{ secrets.AWS_GHA_ROLE_ARN }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
-          if [ -z "${{ secrets.AWS_GHA_ROLE_ARN }}" ] || [ -z "${{ secrets.ECR_REPOSITORY }}" ]; then
+          if [ -z "$AWS_GHA_ROLE_ARN" ] || [ -z "$ECR_REPOSITORY" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
@@ -86,5 +87,20 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+      - name: Check prod deploy prerequisites
+        id: prod_prereq
+        env:
+          AWS_GHA_ROLE_ARN: ${{ secrets.AWS_GHA_ROLE_ARN }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+        run: |
+          if [ -z "$AWS_GHA_ROLE_ARN" ] || [ -z "$ECR_REPOSITORY" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Deploy prod
+        if: ${{ steps.prod_prereq.outputs.ready == 'true' }}
         run: helm upgrade --install neurosynth helm/neurosynth -f helm/neurosynth/values-prod.yaml
+      - name: Skip prod deploy when secrets absent
+        if: ${{ steps.prod_prereq.outputs.ready != 'true' }}
+        run: echo "Skipping prod deploy: AWS_GHA_ROLE_ARN/ECR_REPOSITORY secrets are not configured."
