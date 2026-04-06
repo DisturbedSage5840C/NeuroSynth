@@ -55,8 +55,6 @@ STATE: Dict[str, Any] = {
     "dataset_size": 0,
 }
 
-FEATURE_KEYS = ["age", "educ", "ses", "mmse", "cdr", "etiv", "nwbv", "asf"]
-
 
 def _patient_to_vector(patient: PatientRequest) -> np.ndarray:
     return np.array(
