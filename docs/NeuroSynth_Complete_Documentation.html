@@ -1,368 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NeuroSynth - Complete System Documentation</title>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-<style>
-  @page { size: A4; margin: 20mm 15mm; }
-  * { box-sizing: border-box; }
-  body {
-    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-    color: #1a1a2e;
-    background: #fff;
-    line-height: 1.58;
-    max-width: 210mm;
-    margin: 0 auto;
-    padding: 20px 30px;
-    font-size: 11px;
-  }
-
-  .cover {
-    page-break-after: always;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 90vh;
-    text-align: center;
-  }
-  .cover h1 { font-size: 38px; color: #0a0a0a; margin-bottom: 8px; letter-spacing: -1px; }
-  .cover .accent { color: #00bcd4; }
-  .cover .subtitle { font-size: 18px; color: #555; margin-bottom: 10px; }
-  .cover .meta { font-size: 13px; color: #888; margin-top: 30px; }
-
-  h1 { font-size: 22px; color: #0a0a0a; border-bottom: 3px solid #00bcd4; padding-bottom: 6px; margin-top: 30px; page-break-after: avoid; }
-  h2 { font-size: 17px; color: #1a1a2e; margin-top: 24px; page-break-after: avoid; }
-  h3 { font-size: 14px; color: #333; margin-top: 18px; page-break-after: avoid; }
-
-  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 10.5px; page-break-inside: auto; }
-  th { background: #0a0a0a; color: #fff; padding: 7px 8px; text-align: left; font-weight: 600; }
-  td { padding: 6px 8px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
-  tr:nth-child(even) { background: #f8f9fa; }
-  tr { page-break-inside: avoid; }
-
-  code {
-    background: #f0f0f0;
-    padding: 1px 5px;
-    border-radius: 3px;
-    font-family: "SF Mono", "Fira Code", monospace;
-    font-size: 10px;
-    color: #c62828;
-  }
-  pre {
-    background: #1a1a2e;
-    color: #e0e0e0;
-    padding: 12px 16px;
-    border-radius: 6px;
-    overflow-x: auto;
-    font-size: 10px;
-    line-height: 1.5;
-    page-break-inside: avoid;
-  }
-
-  .section-break { page-break-before: always; }
-  .toc li { margin: 4px 0; }
-  .toc a { text-decoration: none; color: #00838f; }
-
-  .badge {
-    display: inline-block; padding: 6px 18px; border-radius: 20px;
-    background: #00bcd4; color: #fff; font-weight: 600; font-size: 13px; margin: 5px;
-  }
-
-  .info-box {
-    background: #e0f7fa; border-left: 4px solid #00bcd4; padding: 10px 14px;
-    border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 11px;
-  }
-  .warn-box {
-    background: #fff7ed; border-left: 4px solid #f97316; padding: 10px 14px;
-    border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 11px;
-  }
-
-  .mermaid-container {
-    text-align: center; margin: 16px 0; page-break-inside: avoid;
-    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px;
-  }
-
-  .stat-grid {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0;
-  }
-  .stat-card {
-    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px;
-    padding: 12px; text-align: center; border-top: 3px solid #00bcd4;
-  }
-  .stat-card .num { font-size: 24px; font-weight: 700; color: #0a0a0a; }
-  .stat-card .label { font-size: 10px; color: #666; margin-top: 2px; }
-
-  footer { text-align: center; color: #999; font-size: 9px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 10px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuroSynth Final Documentation</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #334155;
+      --accent: #0ea5e9;
+      --panel: #f8fafc;
+      --line: #cbd5e1;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 980px;
+      padding: 32px 24px 60px;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      line-height: 1.6;
+      background: #ffffff;
+    }
+    h1, h2, h3 { line-height: 1.25; }
+    h1 {
+      font-size: 2rem;
+      margin: 0 0 12px;
+      padding-bottom: 10px;
+      border-bottom: 3px solid var(--accent);
+    }
+    h2 {
+      margin-top: 36px;
+      border-left: 5px solid var(--accent);
+      padding-left: 10px;
+      font-size: 1.3rem;
+    }
+    h3 {
+      margin-top: 24px;
+      font-size: 1.05rem;
+      color: var(--muted);
+    }
+    .meta {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 10px;
+      margin-bottom: 22px;
+      font-size: 0.95rem;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      padding: 14px 16px;
+      margin: 14px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      margin-bottom: 14px;
+      font-size: 0.95rem;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 9px 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th { background: #e2e8f0; }
+    code {
+      background: #eef2ff;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: "SFMono-Regular", ui-monospace, Menlo, monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 14px;
+      overflow-x: auto;
+    }
+    ul, ol { margin-top: 8px; }
+    footer {
+      margin-top: 36px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+      color: #475569;
+      font-size: 0.9rem;
+    }
+  </style>
 </head>
 <body>
-
-<div class="cover">
-  <h1>NeuroSynth <span class="accent">Tracker</span></h1>
-  <div class="subtitle">Complete System Documentation</div>
-  <div class="subtitle" style="font-size:14px; color:#888;">A to Z technical report with architecture, flow, and operations</div>
-
-  <div style="max-width:680px; margin:16px auto; padding:12px 18px; background:#f8f9fa; border-left:4px solid #00bcd4; border-radius:4px; text-align:left; font-size:11px; line-height:1.6; color:#444;">
-    <strong>Problem Statement:</strong> The original NeuroSynth vision had strong enterprise potential but high operational complexity. The current revision keeps the same repository and strategic direction while delivering a practical, real-data baseline that runs locally and can be deployed quickly.
-  </div>
-
-  <div style="margin: 30px 0;">
-    <span class="badge">Python</span>
-    <span class="badge">FastAPI</span>
-    <span class="badge">scikit-learn</span>
-    <span class="badge">HTML</span>
-    <span class="badge">Gradio</span>
-    <span class="badge">GitHub CI</span>
-  </div>
-
-  <div class="stat-grid" style="max-width: 560px;">
-    <div class="stat-card"><div class="num">68</div><div class="label">Root Scope Files</div></div>
-    <div class="stat-card"><div class="num">247</div><div class="label">Source Files</div></div>
-    <div class="stat-card"><div class="num">102</div><div class="label">Test Files</div></div>
-    <div class="stat-card"><div class="num">24</div><div class="label">Real Test Cases</div></div>
-  </div>
-
+  <h1>NeuroSynth - Final Detailed Documentation</h1>
   <div class="meta">
-    <p>Version: 2026.04 Documentation</p>
-    <p>Generated for NeuroSynth repository</p>
+    <strong>Version:</strong> Final Consolidated Build (06 Apr 2026)<br/>
+    <strong>Repository:</strong> NeuroSynth<br/>
+    <strong>Scope:</strong> Data pipeline, backend API, causal + temporal models, React frontend, runtime/test guide.
   </div>
-</div>
 
-<h1>Table of Contents</h1>
-<div class="toc">
-<ol>
-  <li><a href="#overview">Project Overview</a></li>
-  <li><a href="#stack">Technologies Used</a></li>
-  <li><a href="#arch">System Architecture Diagram</a></li>
-  <li><a href="#data">Dataset and Model Pipeline</a></li>
-  <li><a href="#flow">Request Flow Sequence</a></li>
-  <li><a href="#files">Every Key File Explained</a></li>
-  <li><a href="#api">API Reference</a></li>
-  <li><a href="#testing">Testing Matrix</a></li>
-  <li><a href="#ops">Deployment and Run Guide</a></li>
-  <li><a href="#compare">Original vs Current</a></li>
-  <li><a href="#roadmap">Roadmap to Advanced NeuroSynth</a></li>
-  <li><a href="#appendix">Appendix and Metrics</a></li>
-</ol>
-</div>
-
-<div class="section-break"></div>
-<h1 id="overview">1. Project Overview</h1>
-<p><strong>NeuroSynth</strong> is now a runnable neurological risk prediction system built from real OASIS longitudinal records while preserving the original repository's advanced architecture footprint.</p>
-
-<div class="info-box">
-<strong>Current practical mission:</strong> turn the repository into something you can run daily with predictable behavior: inspect data, train model, serve predictions, validate results, and share a deployable interface.
-</div>
-
-<div class="warn-box">
-<strong>Boundary:</strong> This baseline supports product iteration and demonstration. Clinical production use requires external validation, governance, and regulatory process.
-</div>
-
-<h1 id="stack">2. Technologies Used</h1>
-<table>
-  <tr><th>Layer</th><th>Technology</th><th>Language</th><th>Purpose</th></tr>
-  <tr><td>Data Exploration</td><td>pandas</td><td>Python</td><td>CSV profiling, null analysis, label distribution checks</td></tr>
-  <tr><td>Training</td><td>scikit-learn RandomForest</td><td>Python</td><td>Binary classification over 8 biomarkers</td></tr>
-  <tr><td>Model Serialization</td><td>joblib</td><td>Python</td><td>Persist model and label encoder artifacts</td></tr>
-  <tr><td>API Service</td><td>FastAPI + Pydantic</td><td>Python</td><td>Typed schema and prediction endpoint</td></tr>
-  <tr><td>Frontend</td><td>Vanilla HTML/CSS/JS</td><td>HTML + JS</td><td>Interactive browser-based input and response display</td></tr>
-  <tr><td>Free Hosting Option</td><td>Gradio</td><td>Python</td><td>Public demo deployment via Spaces</td></tr>
-  <tr><td>Automation</td><td>zsh script</td><td>Shell</td><td>One-command setup, training, smoke test, and serve</td></tr>
-</table>
-
-<h1 id="arch">3. System Architecture Diagram</h1>
-<div class="mermaid-container">
-  <h3>Minimal Runtime Architecture</h3>
-  <div class="mermaid">
-graph TB
-    CSV[oasis_longitudinal.csv] --> EXP[explore.py]
-    CSV --> TRN[train.py]
-    TRN --> MOD[model.pkl]
-    TRN --> ENC[label_encoder.pkl]
-    MOD --> API[FastAPI main.py]
-    ENC --> API
-    WEB[index.html] -->|POST /predict| API
-    GRD[app.py Gradio] --> MOD
-    GRD --> ENC
-    RUN[run_local.sh] --> EXP
-    RUN --> TRN
-    RUN --> API
+  <h2>1. Project Summary</h2>
+  <p>NeuroSynth is a full-stack research platform for neurological risk prediction using OASIS longitudinal biomarkers. It combines an ensemble biomarker model, an LSTM trajectory model, neural causal discovery, and a structured clinical report generator.</p>
+  <div class="card">
+    <strong>Clinical boundary:</strong> this platform is for research and software engineering validation only, not for direct clinical diagnosis.
   </div>
-</div>
 
-<div class="mermaid-container">
-  <h3>Repository Layering</h3>
-  <div class="mermaid">
-graph LR
-  A[Preserved Enterprise Assets] --> B[Minimal Core Product]
-  B --> C[Stability and Test Hardening]
-  C --> D[Staged MLOps Reintegration]
-  D --> E[Full Advanced NeuroSynth Path]
-  </div>
-</div>
+  <h2>2. System Architecture</h2>
+  <pre>oasis_longitudinal.csv
+        |
+        v
+backend/data_pipeline.py --> scaled features + patient sequences
+        |
+        +--> backend/biomarker_model.py (RF + GB ensemble)
+        |
+        +--> backend/temporal_model.py (PyTorch LSTM)
+        |
+        +--> backend/causal_engine.py (NOTEARS-style graph)
+        |
+        v
+backend/api.py (FastAPI endpoints)
+        |
+        +--> frontend/src/App.jsx (React dashboard)
+        +--> app.py (Gradio interface)
+  </pre>
 
-<h1 id="data">4. Dataset and Model Pipeline</h1>
-<h3>Dataset Contract</h3>
-<table>
-  <tr><th>Field</th><th>Value</th></tr>
-  <tr><td>File</td><td><code>oasis_longitudinal.csv</code></td></tr>
-  <tr><td>Task</td><td>Demented vs Nondemented classification</td></tr>
-  <tr><td>Dropped class</td><td>Converted</td></tr>
-  <tr><td>Features</td><td>Age, EDUC, SES, MMSE, CDR, eTIV, nWBV, ASF</td></tr>
-  <tr><td>Missing data handling</td><td>Drop rows with null values in selected columns</td></tr>
-</table>
+  <h2>3. Repository Structure</h2>
+  <table>
+    <tr><th>Path</th><th>Purpose</th></tr>
+    <tr><td><code>backend/</code></td><td>Core data, model, causal, report, and API modules.</td></tr>
+    <tr><td><code>frontend/</code></td><td>React + Vite analytics dashboard.</td></tr>
+    <tr><td><code>app.py</code></td><td>Gradio multi-tab interface (optional path).</td></tr>
+    <tr><td><code>run_local.sh</code></td><td>One-command local setup + smoke test flow.</td></tr>
+    <tr><td><code>docs/</code></td><td>Project documentation in HTML and PDF.</td></tr>
+  </table>
 
-<h3>Training Settings</h3>
-<table>
-  <tr><th>Property</th><th>Value</th></tr>
-  <tr><td>Estimator</td><td>RandomForestClassifier</td></tr>
-  <tr><td>n_estimators</td><td>100</td></tr>
-  <tr><td>Train/Test split</td><td>80 / 20</td></tr>
-  <tr><td>random_state</td><td>42</td></tr>
-  <tr><td>Outputs</td><td><code>model.pkl</code>, <code>label_encoder.pkl</code></td></tr>
-</table>
+  <h2>4. Core API Endpoints</h2>
+  <table>
+    <tr><th>Method</th><th>Route</th><th>Function</th></tr>
+    <tr><td>GET</td><td><code>/health</code></td><td>Service + model startup status.</td></tr>
+    <tr><td>GET</td><td><code>/model/performance</code></td><td>Classification metrics.</td></tr>
+    <tr><td>GET</td><td><code>/model/feature_importance</code></td><td>Feature contribution scores.</td></tr>
+    <tr><td>GET</td><td><code>/causal/graph</code></td><td>Directed causal edges and top causes.</td></tr>
+    <tr><td>POST</td><td><code>/predict</code></td><td>Risk label, probability, confidence, trajectory.</td></tr>
+    <tr><td>POST</td><td><code>/report</code></td><td>Structured clinical report output.</td></tr>
+    <tr><td>POST</td><td><code>/simulate</code></td><td>Counterfactual intervention impact.</td></tr>
+    <tr><td>GET</td><td><code>/dataset/stats</code></td><td>Dataset distributions and aggregate stats.</td></tr>
+  </table>
 
-<h1 id="flow">5. Request Flow Sequence</h1>
-<div class="mermaid-container">
-  <h3>Prediction Flow</h3>
-  <div class="mermaid">
-sequenceDiagram
-  participant U as User
-  participant H as index.html
-  participant F as FastAPI /predict
-  participant M as RandomForest
-  U->>H: Enter 8 feature values
-  H->>F: POST JSON payload
-  F->>F: Validate schema and build DataFrame
-  F->>M: predict + predict_proba
-  M-->>F: class index + probabilities
-  F->>F: inverse label decode
-  F-->>H: prediction + confidence
-  H-->>U: Render result block
-  </div>
-</div>
+  <h2>5. Model Design</h2>
+  <h3>Biomarker model</h3>
+  <ul>
+    <li>RandomForest + GradientBoosting ensemble.</li>
+    <li>Probability is averaged from both classifiers.</li>
+    <li>Risk levels bucketed as Low, Moderate, High, Critical.</li>
+  </ul>
 
-<h1 id="files">6. Every Key File Explained</h1>
-<table>
-  <tr><th>File</th><th>Lines</th><th>What it does</th></tr>
-  <tr><td><code>main.py</code></td><td>58</td><td>FastAPI app, CORS config, request model, root endpoint, prediction endpoint</td></tr>
-  <tr><td><code>train.py</code></td><td>37</td><td>Load data, filter classes, train model, print report, save artifacts</td></tr>
-  <tr><td><code>explore.py</code></td><td>9</td><td>Dataset shape/head/columns/nulls/class counts</td></tr>
-  <tr><td><code>index.html</code></td><td>85</td><td>Web form and fetch integration to backend endpoint</td></tr>
-  <tr><td><code>app.py</code></td><td>36</td><td>Gradio wrapper around the same model artifacts</td></tr>
-  <tr><td><code>run_local.sh</code></td><td>65</td><td>Install deps, explore, train, smoke test, optional server startup</td></tr>
-  <tr><td><code>test_payloads.json</code></td><td>generated</td><td>24 real examples with expected labels for bulk validation</td></tr>
-  <tr><td><code>test_payloads.ndjson</code></td><td>generated</td><td>Line-delimited form for scripting pipelines</td></tr>
-</table>
+  <h3>Temporal model</h3>
+  <ul>
+    <li>PyTorch LSTM over patient visit sequences.</li>
+    <li>Outputs 6-step trajectory for months 6..36.</li>
+    <li>Fallback heuristic if sequence training is insufficient.</li>
+  </ul>
 
-<h1 id="api">7. API Reference</h1>
-<table>
-  <tr><th>Method</th><th>Endpoint</th><th>Auth</th><th>Purpose</th></tr>
-  <tr><td>GET</td><td><code>/</code></td><td>No</td><td>Service health indicator</td></tr>
-  <tr><td>POST</td><td><code>/predict</code></td><td>No</td><td>Predict class and confidence from feature payload</td></tr>
-</table>
+  <h3>Causal model</h3>
+  <ul>
+    <li>Learnable adjacency matrix with acyclicity penalty.</li>
+    <li>Per-variable MLP structural equations.</li>
+    <li>Returns directed edges and intervention estimates.</li>
+  </ul>
 
-<h3>Example Request</h3>
-<pre>{
-  "age": 75,
-  "educ": 12,
-  "ses": 2,
-  "mmse": 24,
-  "cdr": 0.5,
-  "etiv": 1450,
-  "nwbv": 0.72,
-  "asf": 1.2
-}</pre>
+  <h2>6. Frontend Features</h2>
+  <ul>
+    <li>Dashboard with performance and feature charts.</li>
+    <li>Patient analysis form with risk gauge and trajectory plot.</li>
+    <li>Causal network SVG and intervention simulator.</li>
+    <li>Research tab with methodology and references.</li>
+  </ul>
 
-<h3>Example Response</h3>
-<pre>{
-  "prediction": "Demented",
-  "confidence": 100.0
-}</pre>
+  <h2>7. Local Run Instructions</h2>
+  <pre># backend
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+python -m backend.api
 
-<h1 id="testing">8. Testing Matrix</h1>
-<table>
-  <tr><th>Test Type</th><th>Method</th><th>Status</th></tr>
-  <tr><td>Local flow test</td><td><code>./run_local.sh</code></td><td>Pass</td></tr>
-  <tr><td>API smoke test</td><td>FastAPI TestClient in script</td><td>Pass</td></tr>
-  <tr><td>Bulk payload validation</td><td>24 real payload set</td><td>23/24 match (95.83 percent)</td></tr>
-  <tr><td>Repository test suite</td><td><code>pytest -q</code></td><td>Pass</td></tr>
-</table>
+# frontend (new terminal)
+cd frontend
+npm install
+npm run dev -- --host 0.0.0.0 --port 5173</pre>
 
-<h1 id="ops">9. Deployment and Run Guide</h1>
-<h3>One-command local run</h3>
-<pre><code>./run_local.sh</code></pre>
+  <h2>8. Test Checklist</h2>
+  <ol>
+    <li>Open frontend: <code>http://localhost:5173</code></li>
+    <li>Verify API health: <code>GET /health</code></li>
+    <li>Submit sample biomarkers in Patient Analysis tab.</li>
+    <li>Check trajectory chart and top risk factors.</li>
+    <li>Run intervention simulation and review deltas.</li>
+  </ol>
 
-<h3>No-serve mode</h3>
-<pre><code>./run_local.sh --no-serve</code></pre>
+  <h2>9. Environment Variables</h2>
+  <p>Use <code>.env</code> for optional report generation token:</p>
+  <pre>HF_TOKEN=your_huggingface_token_here</pre>
+  <p>Never commit real tokens into the repository.</p>
 
-<h3>Manual mode</h3>
-<pre><code>pip install -r requirements.txt
-python explore.py
-python train.py
-uvicorn main:app --reload</code></pre>
+  <h2>10. Deployment Notes</h2>
+  <ul>
+    <li>Docker and docker-compose are included for containerized runs.</li>
+    <li>Frontend can be served separately from API in production.</li>
+    <li>Model files are generated in <code>models/</code> during training/startup.</li>
+  </ul>
 
-<h1 id="compare">10. Original vs Current</h1>
-<table>
-  <tr><th>Dimension</th><th>Original Project Direction</th><th>Current Practical Implementation</th></tr>
-  <tr><td>Architecture scope</td><td>Broad enterprise modules and infra orientation</td><td>Focused runnable ML app pipeline</td></tr>
-  <tr><td>Operational overhead</td><td>High</td><td>Low</td></tr>
-  <tr><td>Time to value</td><td>Long setup cycle</td><td>Short run cycle</td></tr>
-  <tr><td>Assets retained</td><td>Terraform, Helm, CI, scripts, src modules</td><td>Fully retained for phased return</td></tr>
-</table>
-
-<h1 id="roadmap">11. Roadmap to Advanced NeuroSynth</h1>
-<div class="mermaid-container">
-  <h3>Phased Progression</h3>
-  <div class="mermaid">
-graph TD
-  P1[Phase 1 Baseline hardening] --> P2[Phase 2 MLOps midpoint]
-  P2 --> P3[Phase 3 selective module reintegration]
-  P3 --> P4[Phase 4 production controls and rollout]
-  </div>
-</div>
-
-<table>
-  <tr><th>Phase</th><th>Focus</th><th>Exit Criteria</th></tr>
-  <tr><td>Phase 1</td><td>Validation, logging, reproducibility</td><td>Stable local operation and repeatable outputs</td></tr>
-  <tr><td>Phase 2</td><td>Containerized baseline, staged checks</td><td>Reliable pre-prod pipeline</td></tr>
-  <tr><td>Phase 3</td><td>Re-enable selected advanced modules</td><td>Expanded capability with passing tests</td></tr>
-  <tr><td>Phase 4</td><td>Infra-backed deployment controls</td><td>Monitored, rollback-ready production path</td></tr>
-</table>
-
-<div class="section-break"></div>
-<h1 id="appendix">12. Appendix and Metrics</h1>
-<div class="stat-grid">
-  <div class="stat-card"><div class="num">68</div><div class="label">Root Scope Files</div></div>
-  <div class="stat-card"><div class="num">247</div><div class="label">Files Under src</div></div>
-  <div class="stat-card"><div class="num">102</div><div class="label">Files Under tests</div></div>
-  <div class="stat-card"><div class="num">3</div><div class="label">Files Under scripts</div></div>
-</div>
-
-<table>
-  <tr><th>Documentation Artifacts</th><th>Path</th></tr>
-  <tr><td>HTML report</td><td><code>docs/NeuroSynth_Complete_Documentation.html</code></td></tr>
-  <tr><td>PDF report</td><td><code>docs/NeuroSynth_Complete_Documentation.pdf</code></td></tr>
-</table>
-
-<footer>
-  <p>NeuroSynth Complete System Documentation</p>
-  <p>Generated in April 2026</p>
-</footer>
-
-<script>
-  mermaid.initialize({
-    startOnLoad: true,
-    theme: "default",
-    securityLevel: "loose",
-    flowchart: { useMaxWidth: true, htmlLabels: true, curve: "basis" },
-    sequence: { useMaxWidth: true, actorFontSize: 11, messageFontSize: 11 },
-    er: { useMaxWidth: true, fontSize: 10 }
-  });
-</script>
-
+  <footer>
+    NeuroSynth Final Documentation - Generated 06 Apr 2026
+  </footer>
 </body>
 </html>

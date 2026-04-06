@@ -3,315 +3,215 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NeuroSynth A-to-Z Project Document</title>
+  <title>NeuroSynth Final Documentation</title>
   <style>
     :root {
-      --bg: #f7f5ef;
-      --ink: #1f2937;
-      --muted: #4b5563;
-      --card: #ffffff;
-      --accent: #0b7285;
-      --accent-2: #c2410c;
-      --line: #d1d5db;
+      --ink: #0f172a;
+      --muted: #334155;
+      --accent: #0ea5e9;
+      --panel: #f8fafc;
+      --line: #cbd5e1;
     }
-    * { box-sizing: border-box; }
     body {
-      margin: 0;
-      font-family: Georgia, "Times New Roman", serif;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at 10% 0%, #e8f3f5 0%, transparent 40%),
-        radial-gradient(circle at 90% 100%, #fde9dd 0%, transparent 35%),
-        var(--bg);
-      line-height: 1.65;
-    }
-    .wrap {
-      max-width: 980px;
       margin: 0 auto;
-      padding: 48px 22px 80px;
+      max-width: 980px;
+      padding: 32px 24px 60px;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      line-height: 1.6;
+      background: #ffffff;
     }
-    .hero {
-      background: linear-gradient(130deg, #0b7285, #155e75 55%, #1f2937);
-      color: #fff;
-      border-radius: 18px;
-      padding: 36px 30px;
-      box-shadow: 0 14px 34px rgba(11, 114, 133, 0.25);
-      margin-bottom: 28px;
-    }
-    .hero h1 {
-      margin: 0 0 10px;
-      font-size: clamp(28px, 3.3vw, 44px);
-      letter-spacing: 0.3px;
-    }
-    .hero p { margin: 0; color: #dff4f8; font-size: 18px; }
-    .toc, .card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 22px;
-      margin: 18px 0;
-      box-shadow: 0 5px 16px rgba(0,0,0,0.04);
+    h1, h2, h3 { line-height: 1.25; }
+    h1 {
+      font-size: 2rem;
+      margin: 0 0 12px;
+      padding-bottom: 10px;
+      border-bottom: 3px solid var(--accent);
     }
     h2 {
-      margin: 34px 0 10px;
-      font-size: 30px;
-      color: #0f172a;
+      margin-top: 36px;
+      border-left: 5px solid var(--accent);
+      padding-left: 10px;
+      font-size: 1.3rem;
     }
     h3 {
       margin-top: 24px;
-      margin-bottom: 8px;
-      color: #0b7285;
-      font-size: 22px;
+      font-size: 1.05rem;
+      color: var(--muted);
     }
-    ul, ol { margin-top: 8px; }
-    li { margin-bottom: 6px; }
-    code {
-      font-family: "Courier New", monospace;
-      background: #f3f4f6;
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      padding: 1px 6px;
+    .meta {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 10px;
+      margin-bottom: 22px;
+      font-size: 0.95rem;
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      padding: 14px 16px;
+      margin: 14px 0;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 12px 0;
-      background: #fff;
+      margin-top: 10px;
+      margin-bottom: 14px;
+      font-size: 0.95rem;
     }
     th, td {
-      border: 1px solid #d1d5db;
-      padding: 10px;
-      text-align: left;
+      border: 1px solid var(--line);
+      padding: 9px 10px;
       vertical-align: top;
+      text-align: left;
     }
-    th { background: #f9fafb; }
-    .tag {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 99px;
-      font-size: 12px;
-      font-weight: bold;
-      margin-right: 8px;
-      background: #e0f2fe;
-      color: #0c4a6e;
+    th { background: #e2e8f0; }
+    code {
+      background: #eef2ff;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-family: "SFMono-Regular", ui-monospace, Menlo, monospace;
+      font-size: 0.92em;
     }
-    .warn {
-      border-left: 4px solid var(--accent-2);
-      background: #fff7ed;
-      padding: 12px;
-      border-radius: 8px;
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 14px;
+      overflow-x: auto;
     }
-    .ok {
-      border-left: 4px solid #15803d;
-      background: #f0fdf4;
-      padding: 12px;
-      border-radius: 8px;
-    }
-    @media print {
-      body { background: #fff; }
-      .hero { box-shadow: none; }
-      .toc, .card { box-shadow: none; }
-      a { color: #111; }
+    ul, ol { margin-top: 8px; }
+    footer {
+      margin-top: 36px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+      color: #475569;
+      font-size: 0.9rem;
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <section class="hero">
-      <h1>NeuroSynth: A-to-Z Project Document</h1>
-      <p>Original enterprise architecture vs current minimal implementation, migration strategy, and full run/deploy guide.</p>
-    </section>
-
-    <section class="toc">
-      <h3>Table of Contents</h3>
-      <ol>
-        <li>Project Vision</li>
-        <li>Original Architecture (Enterprise)</li>
-        <li>Current Architecture (Minimal)</li>
-        <li>Exact Differences</li>
-        <li>What Was Preserved</li>
-        <li>What Was Simplified</li>
-        <li>Current End-to-End Workflow</li>
-        <li>Quality, Risks, and Limits</li>
-        <li>Step-by-Step Path Back to Advanced NeuroSynth</li>
-        <li>Roadmap and Milestones</li>
-        <li>Operations and Commands</li>
-        <li>Appendix: File Inventory</li>
-      </ol>
-    </section>
-
-    <h2>1) Project Vision</h2>
-    <div class="card">
-      <p><strong>NeuroSynth</strong> aims to predict neurological decline risk from clinical and biomarker signals, eventually evolving into a multimodal platform that includes imaging, genomics, temporal modeling, causality, and clinical report generation.</p>
-      <p>The current implementation keeps this vision but delivers a practical, single-developer runnable path.</p>
-    </div>
-
-    <h2>2) Original Architecture (Enterprise)</h2>
-    <div class="card">
-      <p><span class="tag">Original</span> Designed for production-scale MLOps and cloud operations:</p>
-      <ul>
-        <li>Cloud infra contracts and templates in <code>terraform/</code></li>
-        <li>Kubernetes packaging in <code>helm/</code></li>
-        <li>Dockerized service path via <code>Dockerfile</code> and <code>docker-compose.yml</code></li>
-        <li>CI/CD and quality/security gates in <code>.github/workflows/</code></li>
-        <li>Large source layout in <code>src/neurosynth/</code> for advanced modules</li>
-        <li>Extensive tests in <code>tests/</code></li>
-      </ul>
-    </div>
-
-    <h2>3) Current Architecture (Minimal)</h2>
-    <div class="card">
-      <p><span class="tag">Current</span> Lean runnable flow built from your OASIS CSV:</p>
-      <ul>
-        <li><code>explore.py</code>: dataset inspection and sanity checks</li>
-        <li><code>train.py</code>: RandomForest training and artifact export</li>
-        <li><code>main.py</code>: FastAPI inference service (<code>/predict</code>)</li>
-        <li><code>index.html</code>: browser-based local UI</li>
-        <li><code>app.py</code>: Gradio app for Hugging Face Spaces</li>
-        <li><code>requirements.txt</code>: simple runtime dependencies</li>
-      </ul>
-    </div>
-
-    <h2>4) Exact Differences</h2>
-    <div class="card">
-      <table>
-        <thead>
-          <tr>
-            <th>Area</th>
-            <th>Before</th>
-            <th>Now</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Primary path to value</td>
-            <td>Distributed, enterprise components</td>
-            <td>Single local training + API + UI</td>
-          </tr>
-          <tr>
-            <td>Data onboarding</td>
-            <td>Complex multi-source connectors</td>
-            <td>Direct CSV in repo root (<code>oasis_longitudinal.csv</code>)</td>
-          </tr>
-          <tr>
-            <td>Modeling</td>
-            <td>Multiple advanced model families</td>
-            <td>RandomForest binary classifier</td>
-          </tr>
-          <tr>
-            <td>Inference</td>
-            <td>Infra-bound orchestration</td>
-            <td>FastAPI endpoint + browser/Gradio clients</td>
-          </tr>
-          <tr>
-            <td>Deployment</td>
-            <td>AWS/K8s oriented</td>
-            <td>Hugging Face Spaces (free path)</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2>5) What Was Preserved</h2>
-    <div class="card ok">
-      <ul>
-        <li>Repository name remains <strong>NeuroSynth</strong></li>
-        <li>Enterprise directories remain intact and untouched</li>
-        <li>CI, Docker, Terraform, Helm, and source modules are still available for future growth</li>
-      </ul>
-    </div>
-
-    <h2>6) What Was Simplified</h2>
-    <div class="card warn">
-      <ul>
-        <li>Reduced immediate required stack to Python + scikit-learn + FastAPI</li>
-        <li>Focused target to binary classification (Demented vs Nondemented)</li>
-        <li>Moved deployment recommendation to no-cost path first</li>
-      </ul>
-    </div>
-
-    <h2>7) Current End-to-End Workflow</h2>
-    <div class="card">
-      <h3>Data</h3>
-      <p>Input CSV is expected at project root: <code>oasis_longitudinal.csv</code>.</p>
-      <h3>Exploration</h3>
-      <p>Run <code>python explore.py</code> to inspect shape, columns, null counts, and class distribution.</p>
-      <h3>Training</h3>
-      <p>Run <code>python train.py</code> to train and produce:</p>
-      <ul>
-        <li><code>model.pkl</code></li>
-        <li><code>label_encoder.pkl</code></li>
-      </ul>
-      <h3>API</h3>
-      <p>Run <code>uvicorn main:app --reload</code> and call <code>POST /predict</code>.</p>
-      <h3>UI</h3>
-      <p>Open <code>index.html</code> locally, submit biomarker values, and view prediction/confidence.</p>
-      <h3>Free Deployment</h3>
-      <p>Use <code>app.py</code> in Hugging Face Spaces with <code>requirements.txt</code>.</p>
-    </div>
-
-    <h2>8) Quality, Risks, and Limits</h2>
-    <div class="card">
-      <ul>
-        <li>Model is a practical baseline, not a clinical-grade validated decision system</li>
-        <li>Dataset size and label quality constrain generalization</li>
-        <li>No external calibration/monitoring loop in minimal mode</li>
-        <li>Clinical use requires governance, validation, and regulatory controls</li>
-      </ul>
-    </div>
-
-    <h2>9) Step-by-Step Path Back to Advanced NeuroSynth</h2>
-    <div class="card">
-      <h3>Phase A (Now to Stable Baseline)</h3>
-      <ol>
-        <li>Version artifacts and metrics per training run</li>
-        <li>Add robust input validation and error handling</li>
-        <li>Add basic model-card and reproducibility notes</li>
-      </ol>
-      <h3>Phase B (Intermediate)</h3>
-      <ol>
-        <li>Add experiment tracking (MLflow or similar)</li>
-        <li>Containerize minimal app and add health checks</li>
-        <li>Add simple staging deploy pipeline</li>
-      </ol>
-      <h3>Phase C (Advanced)</h3>
-      <ol>
-        <li>Reintegrate temporal and multimodal modules from <code>src/neurosynth/</code></li>
-        <li>Restore cloud infra deployment paths in Terraform/Helm</li>
-        <li>Enable secret-managed production deploy with strict gates</li>
-      </ol>
-    </div>
-
-    <h2>10) Roadmap and Milestones</h2>
-    <div class="card">
-      <table>
-        <thead>
-          <tr><th>Milestone</th><th>Outcome</th><th>Owner</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>M1: Baseline publish</td><td>HF Space online with working predictions</td><td>You</td></tr>
-          <tr><td>M2: Reliability hardening</td><td>Validation, tests, reproducible artifacts</td><td>Joint</td></tr>
-          <tr><td>M3: Staging MLOps</td><td>Container + staging CI deploy</td><td>Joint</td></tr>
-          <tr><td>M4: Enterprise re-entry</td><td>Infra-backed rollout and multi-model orchestration</td><td>Joint</td></tr>
-        </tbody>
-      </table>
-    </div>
-
-    <h2>11) Operations and Commands</h2>
-    <div class="card">
-      <pre>pip install -r requirements.txt
-python explore.py
-python train.py
-uvicorn main:app --reload</pre>
-      <p>Then open API docs at <code>http://localhost:8000/docs</code>.</p>
-    </div>
-
-    <h2>12) Appendix: File Inventory</h2>
-    <div class="card">
-      <p><strong>Minimal flow files:</strong> <code>explore.py</code>, <code>train.py</code>, <code>main.py</code>, <code>index.html</code>, <code>app.py</code>, <code>requirements.txt</code>, <code>model.pkl</code>, <code>label_encoder.pkl</code>.</p>
-      <p><strong>Enterprise-capable structure kept:</strong> <code>src/</code>, <code>tests/</code>, <code>scripts/</code>, <code>terraform/</code>, <code>helm/</code>, <code>.github/workflows/</code>, <code>Dockerfile</code>.</p>
-      <p><strong>Date:</strong> 4 April 2026</p>
-    </div>
+  <h1>NeuroSynth - Final Detailed Documentation</h1>
+  <div class="meta">
+    <strong>Version:</strong> Final Consolidated Build (06 Apr 2026)<br/>
+    <strong>Repository:</strong> NeuroSynth<br/>
+    <strong>Scope:</strong> Data pipeline, backend API, causal + temporal models, React frontend, runtime/test guide.
   </div>
+
+  <h2>1. Project Summary</h2>
+  <p>NeuroSynth is a full-stack research platform for neurological risk prediction using OASIS longitudinal biomarkers. It combines an ensemble biomarker model, an LSTM trajectory model, neural causal discovery, and a structured clinical report generator.</p>
+  <div class="card">
+    <strong>Clinical boundary:</strong> this platform is for research and software engineering validation only, not for direct clinical diagnosis.
+  </div>
+
+  <h2>2. System Architecture</h2>
+  <pre>oasis_longitudinal.csv
+        |
+        v
+backend/data_pipeline.py --> scaled features + patient sequences
+        |
+        +--> backend/biomarker_model.py (RF + GB ensemble)
+        |
+        +--> backend/temporal_model.py (PyTorch LSTM)
+        |
+        +--> backend/causal_engine.py (NOTEARS-style graph)
+        |
+        v
+backend/api.py (FastAPI endpoints)
+        |
+        +--> frontend/src/App.jsx (React dashboard)
+        +--> app.py (Gradio interface)
+  </pre>
+
+  <h2>3. Repository Structure</h2>
+  <table>
+    <tr><th>Path</th><th>Purpose</th></tr>
+    <tr><td><code>backend/</code></td><td>Core data, model, causal, report, and API modules.</td></tr>
+    <tr><td><code>frontend/</code></td><td>React + Vite analytics dashboard.</td></tr>
+    <tr><td><code>app.py</code></td><td>Gradio multi-tab interface (optional path).</td></tr>
+    <tr><td><code>run_local.sh</code></td><td>One-command local setup + smoke test flow.</td></tr>
+    <tr><td><code>docs/</code></td><td>Project documentation in HTML and PDF.</td></tr>
+  </table>
+
+  <h2>4. Core API Endpoints</h2>
+  <table>
+    <tr><th>Method</th><th>Route</th><th>Function</th></tr>
+    <tr><td>GET</td><td><code>/health</code></td><td>Service + model startup status.</td></tr>
+    <tr><td>GET</td><td><code>/model/performance</code></td><td>Classification metrics.</td></tr>
+    <tr><td>GET</td><td><code>/model/feature_importance</code></td><td>Feature contribution scores.</td></tr>
+    <tr><td>GET</td><td><code>/causal/graph</code></td><td>Directed causal edges and top causes.</td></tr>
+    <tr><td>POST</td><td><code>/predict</code></td><td>Risk label, probability, confidence, trajectory.</td></tr>
+    <tr><td>POST</td><td><code>/report</code></td><td>Structured clinical report output.</td></tr>
+    <tr><td>POST</td><td><code>/simulate</code></td><td>Counterfactual intervention impact.</td></tr>
+    <tr><td>GET</td><td><code>/dataset/stats</code></td><td>Dataset distributions and aggregate stats.</td></tr>
+  </table>
+
+  <h2>5. Model Design</h2>
+  <h3>Biomarker model</h3>
+  <ul>
+    <li>RandomForest + GradientBoosting ensemble.</li>
+    <li>Probability is averaged from both classifiers.</li>
+    <li>Risk levels bucketed as Low, Moderate, High, Critical.</li>
+  </ul>
+
+  <h3>Temporal model</h3>
+  <ul>
+    <li>PyTorch LSTM over patient visit sequences.</li>
+    <li>Outputs 6-step trajectory for months 6..36.</li>
+    <li>Fallback heuristic if sequence training is insufficient.</li>
+  </ul>
+
+  <h3>Causal model</h3>
+  <ul>
+    <li>Learnable adjacency matrix with acyclicity penalty.</li>
+    <li>Per-variable MLP structural equations.</li>
+    <li>Returns directed edges and intervention estimates.</li>
+  </ul>
+
+  <h2>6. Frontend Features</h2>
+  <ul>
+    <li>Dashboard with performance and feature charts.</li>
+    <li>Patient analysis form with risk gauge and trajectory plot.</li>
+    <li>Causal network SVG and intervention simulator.</li>
+    <li>Research tab with methodology and references.</li>
+  </ul>
+
+  <h2>7. Local Run Instructions</h2>
+  <pre># backend
+source .venv/bin/activate
+pip install -r backend/requirements.txt
+python -m backend.api
+
+# frontend (new terminal)
+cd frontend
+npm install
+npm run dev -- --host 0.0.0.0 --port 5173</pre>
+
+  <h2>8. Test Checklist</h2>
+  <ol>
+    <li>Open frontend: <code>http://localhost:5173</code></li>
+    <li>Verify API health: <code>GET /health</code></li>
+    <li>Submit sample biomarkers in Patient Analysis tab.</li>
+    <li>Check trajectory chart and top risk factors.</li>
+    <li>Run intervention simulation and review deltas.</li>
+  </ol>
+
+  <h2>9. Environment Variables</h2>
+  <p>Use <code>.env</code> for optional report generation token:</p>
+  <pre>HF_TOKEN=your_huggingface_token_here</pre>
+  <p>Never commit real tokens into the repository.</p>
+
+  <h2>10. Deployment Notes</h2>
+  <ul>
+    <li>Docker and docker-compose are included for containerized runs.</li>
+    <li>Frontend can be served separately from API in production.</li>
+    <li>Model files are generated in <code>models/</code> during training/startup.</li>
+  </ul>
+
+  <footer>
+    NeuroSynth Final Documentation - Generated 06 Apr 2026
+  </footer>
 </body>
 </html>
