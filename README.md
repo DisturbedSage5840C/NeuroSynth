@@ -60,8 +60,12 @@ The platform trains directly from OASIS longitudinal data and exposes a unified 
 git clone https://github.com/DisturbedSage5840C/NeuroSynth.git
 cd NeuroSynth
 
+source .venv312/bin/activate
 pip install -r backend/requirements.txt
-python backend/api.py
+set -a
+source .env
+set +a
+python -m backend.api
 ```
 
 In a second terminal for frontend:
@@ -73,6 +77,31 @@ npm run dev
 ```
 
 Open http://localhost:5173
+
+## Extended Testing Pack
+
+NeuroSynth includes a ready 20-case test pack and walkthrough:
+
+- `test_payloads_20.json`
+- `docs/testing_guide_20_cases.md`
+
+Run all 20 prediction tests in batch:
+
+```bash
+source .venv312/bin/activate
+python - <<'PY'
+import json
+import requests
+
+with open('test_payloads_20.json', 'r') as f:
+	cases = json.load(f)
+
+for case in cases:
+	r = requests.post('http://127.0.0.1:8000/predict', json=case['payload'], timeout=30)
+	out = r.json() if r.ok else {"error": r.status_code}
+	print(case['id'], out.get('prediction'), out.get('risk_level'), out.get('probability'))
+PY
+```
 
 ## Docker
 
