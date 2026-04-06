@@ -1,121 +1,163 @@
 # NeuroSynth
 
-Clinical-risk prediction, simplified to run fast and ship now.
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-00a393)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.2-ee4c2c)
+![React](https://img.shields.io/badge/React-18-61dafb)
+![HuggingFace](https://img.shields.io/badge/HuggingFace-Inference-yellow)
 
-## Overview
+## What This Is
 
-NeuroSynth now has a practical minimal core built on real OASIS longitudinal data.
+NeuroSynth is a production-grade neurological AI research platform that integrates:
 
-- Task: binary prediction (`Demented` vs `Nondemented`)
-- Model: `RandomForestClassifier`
-- API: FastAPI (`/predict`)
-- UI: local HTML form + Gradio deployment option
+- Biomarker-based dementia risk prediction
+- Longitudinal progression forecasting
+- Neural causal discovery over key biomarkers
+- LLM-powered structured clinical report generation
+- Interactive React dashboard for analysis and simulation
 
-This keeps the repository name and structure as **NeuroSynth**, while making the core workflow runnable by one developer.
+The platform trains directly from OASIS longitudinal data and exposes a unified API for inference, reporting, and causal intervention simulation.
 
-## Original vs Current
+## Architecture
 
-| Area | Original NeuroSynth | Current NeuroSynth Core |
-|---|---|---|
-| Runtime complexity | Enterprise-scale stack | Lightweight local stack |
-| Deployment path | Infra-heavy cloud workflow | Local + free Hugging Face path |
-| Modeling scope | Multi-module advanced architecture | Focused baseline classifier |
-| Time to first result | High setup effort | Minutes |
-
-## What Changed (Minimal Scope)
-
-- Added `explore.py` for dataset inspection
-- Added `train.py` for training and artifact export
-- Added `main.py` for prediction API
-- Added `index.html` for a quick browser UI
-- Added `app.py` for Gradio deployment
-- Added `requirements.txt` for minimal runtime dependencies
-- Updated this `README.md`
-
-Everything else in the repository remains intact.
-
-## Data Contract
-
-Place `oasis_longitudinal.csv` in the repository root.
-
-Features used:
-
-- `Age`
-- `EDUC`
-- `SES`
-- `MMSE`
-- `CDR`
-- `eTIV`
-- `nWBV`
-- `ASF`
-
-## Local Run (A to B to C)
-
-1. Install dependencies
-
-```bash
-pip install -r requirements.txt
+```text
+													+---------------------------+
+													| oasis_longitudinal.csv    |
+													+------------+--------------+
+																			 |
+																			 v
++--------------------+      +----------+-----------+      +----------------------+
+| backend/data_      | ---> | backend/api.py       | ---> | React Frontend       |
+| pipeline.py        |      | FastAPI orchestration|      | frontend/src/App.jsx |
++--------------------+      +----------+-----------+      +----------+-----------+
+																			 |                             |
+																			 v                             v
+						 +------------------+  +-------------------+   +----------------------+
+						 | Biomarker Ensemble| | Temporal LSTM      |   | Causal SVG Network   |
+						 | RF + GB           | | Progression Model  |   | + Intervention Sim   |
+						 +-------------------+ +--------------------+   +----------------------+
+												 \             /         \
+													\           /           \
+													 v         v             v
+										+--------------------------------------+
+										| Clinical Report Generator (HF API)   |
+										| mistralai/Mistral-7B-Instruct-v0.3   |
+										+--------------------------------------+
 ```
 
-2. Explore and verify the dataset
+## Feature List
+
+- Prediction engine: ensemble RandomForest + GradientBoosting
+- Temporal forecasting: PyTorch LSTM trajectory for 6 to 36 months
+- Causal discovery: NOTEARS-style neural graph learning (pure PyTorch)
+- Clinical reports: Hugging Face Inference API structured reports
+- Frontend analytics: performance charts, feature importance, risk gauge, causal map
+- Intervention simulation: estimated CDR risk change from modifiable biomarker shifts
+
+## Quick Start
 
 ```bash
-python explore.py
+git clone https://github.com/DisturbedSage5840C/NeuroSynth.git
+cd NeuroSynth
+
+pip install -r backend/requirements.txt
+python backend/api.py
 ```
 
-3. Train model artifacts
+In a second terminal for frontend:
 
 ```bash
-python train.py
+cd frontend
+npm install
+npm run dev
 ```
 
-Outputs:
+Open http://localhost:5173
 
-- `model.pkl`
-- `label_encoder.pkl`
-
-4. Start API
+## Docker
 
 ```bash
-uvicorn main:app --reload
+docker-compose up --build
 ```
 
-5. Test endpoints and UI
+API will be available at http://localhost:8000
 
-- Open `http://localhost:8000/docs`
-- Open `index.html` in your browser
+## Hugging Face Spaces Deployment
 
-## Free Deployment (Hugging Face Spaces)
+- Use `app.py` as the Space entry point
+- Set `HF_TOKEN` in Space secrets
+- Ensure `oasis_longitudinal.csv` and `models/` are available in runtime storage
 
-1. Create a new Space (Gradio)
-2. Upload:
-	- `app.py`
-	- `model.pkl`
-	- `label_encoder.pkl`
-	- `requirements.txt`
-3. Let Spaces auto-build and host the app
+## Dataset
 
-## Slow Path Back to Enterprise NeuroSynth
+NeuroSynth uses OASIS Longitudinal MRI and cognitive data.
 
-Phase 1: Baseline hardening
+- Source: https://www.kaggle.com/datasets/jboysen/mri-and-alzheimers
+- Expected local file: `oasis_longitudinal.csv` in repository root
+- Target: `Group` mapped to Demented=1, Nondemented=0
 
-- Add stricter input validation and error handling
-- Save training metrics per run
-- Add reproducibility notes/model card
+## Model Architecture
 
-Phase 2: MLOps foundation
+### Biomarker Predictor
 
-- Add experiment tracking
-- Add containerized serving profile
-- Add staging release checks
+- RandomForestClassifier: `n_estimators=200`, `max_depth=10`, `class_weight=balanced`
+- GradientBoostingClassifier: `n_estimators=100`
+- Ensemble output: average of both probability outputs
 
-Phase 3: Advanced reintegration
+### Temporal Progression Model
 
-- Reconnect temporal/genomic/connectome modules
-- Re-enable full infra-backed deploy path
-- Add production secrets, monitoring, and rollback gates
+- PyTorch LSTM: `input_size=8`, `hidden_size=64`, `num_layers=2`, `dropout=0.3`
+- Head: `Linear(64->32)->ReLU->Dropout->Linear(32->1)->Sigmoid`
+- Output: 36-month projected risk trajectory at months `[6,12,18,24,30,36]`
 
-## Full Detailed Documentation
+### Causal Engine
 
-- HTML full document: `docs/project_a_to_z.html`
-- PDF full document: `docs/project_a_to_z.pdf`
+- NOTEARS-inspired neural formulation
+- Learnable adjacency matrix (`W_logits`) with acyclicity constraint
+- Per-variable MLP structural equations
+- Outputs directed edges, top causal drivers, and intervention simulation
+
+## API Documentation
+
+- `GET /health`
+- `GET /model/performance`
+- `GET /model/feature_importance`
+- `GET /causal/graph`
+- `POST /predict`
+- `POST /report`
+- `POST /simulate`
+- `GET /dataset/stats`
+
+## Environment Variables
+
+Use `.env`:
+
+```bash
+HF_TOKEN=hf_your_token_here
+```
+
+A template is available in `.env.example`.
+
+## Repository Layout
+
+```text
+backend/
+	api.py
+	data_pipeline.py
+	biomarker_model.py
+	temporal_model.py
+	causal_engine.py
+	report_generator.py
+	requirements.txt
+frontend/
+	src/App.jsx
+	package.json
+app.py
+Dockerfile
+docker-compose.yml
+models/
+```
+
+## Disclaimer
+
+This project is a research and engineering tool only. It is not approved for clinical diagnosis, treatment decisions, or medical use. Any outputs must be validated by qualified professionals in regulated clinical workflows.

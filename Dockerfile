@@ -1,12 +1,27 @@
-FROM python:3.12-slim
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ .
+RUN npm run build
+
+FROM python:3.11-slim AS production
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Keep build fast and deterministic for CI image validation.
-COPY src ./src
-COPY pyproject.toml README.md ./
+COPY backend/requirements.txt ./backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
 
-CMD ["python", "-c", "print('NeuroSynth container image ready')"]
+COPY backend/ ./backend/
+COPY backend/api.py ./api.py
+COPY app.py ./app.py
+COPY oasis_longitudinal.csv ./oasis_longitudinal.csv
+COPY --from=frontend-builder /frontend/dist ./static
+
+EXPOSE 8000
+
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
