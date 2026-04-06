@@ -19,7 +19,6 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/ ./backend/
 COPY backend/api.py ./api.py
 COPY app.py ./app.py
-COPY oasis_longitudinal.csv ./oasis_longitudinal.csv
 COPY --from=frontend-builder /frontend/dist ./static
 
 EXPOSE 8000
