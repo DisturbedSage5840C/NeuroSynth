@@ -2,148 +2,179 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import Any
 
 import requests
 
 
 class ClinicalReportGenerator:
-    model = "mistralai/Mistral-7B-Instruct-v0.3"
     endpoint = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
 
     def __init__(self, hf_token: str | None = None) -> None:
         self.hf_token = hf_token or os.getenv("HF_TOKEN", "")
 
     @staticmethod
-    def _build_prompt(patient_data: dict, prediction: dict, trajectory: list, causal_graph: dict) -> str:
-        return (
-            "[INST] You are NeuroSynth's clinical AI. Generate a structured neurological assessment report.\n"
-            f"Patient Data: {patient_data}\n"
-            f"Risk Prediction: {prediction}\n"
-            f"36-Month Trajectory: {trajectory}\n"
-            f"Causal Analysis: {causal_graph}\n"
-            "Generate a report with these exact sections:\n\n"
-            "CLINICAL SUMMARY (2 sentences)\n"
-            "RISK ASSESSMENT (current risk level and key drivers)\n"
-            "PROGRESSION FORECAST (what the 36-month trajectory means clinically)\n"
-            "CAUSAL PATHWAYS (which biomarkers are driving deterioration and why)\n"
-            "INTERVENTION RECOMMENDATIONS (top 3 evidence-based, modifiable recommendations)\n"
-            "MONITORING PROTOCOL (which biomarkers to track and how often)\n"
-            "UNCERTAINTY FLAGS (what data would improve this assessment)\n"
-            "Keep each section concise and clinically actionable. [/INST]"
-        )
-
-    @staticmethod
-    def _parse_sections(text: str) -> Dict[str, str]:
-        section_names = [
-            "CLINICAL SUMMARY",
-            "RISK ASSESSMENT",
-            "PROGRESSION FORECAST",
-            "CAUSAL PATHWAYS",
-            "INTERVENTION RECOMMENDATIONS",
-            "MONITORING PROTOCOL",
-            "UNCERTAINTY FLAGS",
+    def _sections_from_text(text: str) -> dict[str, str]:
+        section_titles = [
+            "1. EXECUTIVE SUMMARY",
+            "2. RISK ASSESSMENT & INTERPRETATION",
+            "3. KEY BIOMARKER ANALYSIS",
+            "4. 36-MONTH PROGRESSION FORECAST",
+            "5. CAUSAL PATHWAY ANALYSIS",
+            "6. MODIFIABLE RISK FACTORS & INTERVENTIONS",
+            "7. MONITORING PROTOCOL",
+            "8. LIFESTYLE OPTIMIZATION PLAN",
+            "9. UNCERTAINTY & LIMITATIONS",
         ]
 
         lines = text.splitlines()
-        sections: Dict[str, List[str]] = {name: [] for name in section_names}
-        current = section_names[0]
+        sections: dict[str, list[str]] = {t: [] for t in section_titles}
+        cur = section_titles[0]
 
-        for raw_line in lines:
-            line = raw_line.strip()
-            matched = next((name for name in section_names if line.upper().startswith(name)), None)
-            if matched:
-                current = matched
-                suffix = line[len(matched) :].lstrip(" :-")
-                if suffix:
-                    sections[current].append(suffix)
+        for raw in lines:
+            line = raw.strip()
+            hit = next((t for t in section_titles if line.upper().startswith(t.upper())), None)
+            if hit:
+                cur = hit
+                rest = line[len(hit) :].strip(" :-")
+                if rest:
+                    sections[cur].append(rest)
                 continue
-            sections[current].append(line)
+            if line:
+                sections[cur].append(line)
 
         return {k: "\n".join(v).strip() for k, v in sections.items()}
 
     def _fallback_report(
         self,
-        patient_data: dict,
-        prediction: dict,
-        trajectory: list,
-        causal_graph: dict,
-    ) -> Dict[str, object]:
-        top_cdr = ", ".join([item["variable"] for item in causal_graph.get("top_causes_of_CDR", [])]) or "No strong drivers detected"
-        top_modifiable = ", ".join(causal_graph.get("modifiable_interventions", [])) or "MMSE, SES, EDUC"
+        patient_data: dict[str, Any],
+        prediction: dict[str, Any],
+        trajectory: list[float],
+        causal_graph: dict[str, Any],
+        shap_values: list[dict[str, float]],
+    ) -> dict[str, Any]:
+        top_risks = ", ".join([f"{r['feature']} ({r['value']})" for r in shap_values[:5]]) or "MMSE, FunctionalAssessment"
+        top_causes = ", ".join([c["variable"] for c in causal_graph.get("top_causes_of_Diagnosis", [])]) or "MMSE, Age"
 
         sections = {
-            "CLINICAL SUMMARY": (
-                f"The current model estimates a {prediction.get('risk_level', 'Unknown')} neurological risk state. "
-                f"The prediction confidence is {prediction.get('confidence', 'Unknown')} with probability {prediction.get('probability', 0)}."
+            "1. EXECUTIVE SUMMARY": (
+                f"The model estimates {prediction.get('probability', 0):.1%} Alzheimer's risk, categorized as "
+                f"{prediction.get('risk_level', 'Unknown')} confidence {prediction.get('confidence', 'Unknown')}."
             ),
-            "RISK ASSESSMENT": (
-                f"Risk level is {prediction.get('risk_level', 'Unknown')} based on integrated biomarker patterns. "
-                f"Primary model drivers include: {top_cdr}."
+            "2. RISK ASSESSMENT & INTERPRETATION": (
+                f"Current profile shows elevated risk drivers from {top_risks}. "
+                f"Predicted class={prediction.get('prediction')} with probability {prediction.get('probability', 0):.1%}."
             ),
-            "PROGRESSION FORECAST": (
-                f"Projected 36-month risk trajectory: {trajectory}. "
-                "Upward movement indicates likely deterioration pressure, while stable or declining values suggest lower progression velocity."
+            "3. KEY BIOMARKER ANALYSIS": (
+                f"Key factors include MMSE={patient_data.get('MMSE')}, FunctionalAssessment={patient_data.get('FunctionalAssessment')}, "
+                f"ADL={patient_data.get('ADL')}, and cardiovascular/lifestyle measures."
             ),
-            "CAUSAL PATHWAYS": (
-                f"Causal graph highlights likely directional influences toward deterioration markers. "
-                f"Most influential contributors for CDR in this run are: {top_cdr}."
+            "4. 36-MONTH PROGRESSION FORECAST": (
+                f"Projected risk trajectory across 6 to 36 months: {trajectory}. "
+                "Higher slope indicates faster deterioration risk."
             ),
-            "INTERVENTION RECOMMENDATIONS": (
-                f"1) Optimize modifiable biomarker pathways: {top_modifiable}. "
-                "2) Increase follow-up cognitive assessments for trend confirmation. "
-                "3) Pair risk monitoring with lifestyle and adherence interventions."
+            "5. CAUSAL PATHWAY ANALYSIS": (
+                f"Causal graph indicates diagnosis is strongly influenced by: {top_causes}."
             ),
-            "MONITORING PROTOCOL": (
-                "Track MMSE and CDR monthly in high-risk cases; track SES-linked care factors quarterly; "
-                "re-evaluate structural biomarkers every 6 to 12 months."
+            "6. MODIFIABLE RISK FACTORS & INTERVENTIONS": (
+                "1) Increase physical activity and sleep quality. 2) Optimize blood pressure and lipid profile. "
+                "3) Cognitive stimulation with regular MMSE tracking. 4) Depression screening/treatment. "
+                "5) Reduce sedentary behavior and improve diet quality."
             ),
-            "UNCERTAINTY FLAGS": (
-                "Additional longitudinal visits, treatment adherence details, and richer multimodal data "
-                "would reduce uncertainty and improve intervention confidence."
+            "7. MONITORING PROTOCOL": (
+                "Track MMSE/FunctionalAssessment/ADL every 3 months; blood pressure and lipid panel every 1 to 3 months; "
+                "trigger escalation if MMSE drops >2 points in 6 months."
+            ),
+            "8. LIFESTYLE OPTIMIZATION PLAN": (
+                "Weekly aerobic activity, Mediterranean-style diet, sleep hygiene protocol, and adherence checks for risk comorbidities."
+            ),
+            "9. UNCERTAINTY & LIMITATIONS": (
+                "Model output is probabilistic and dataset-driven. This is a research tool; clinical decisions require physician oversight."
             ),
         }
-
-        raw_text = "\n\n".join([f"{k}\n{v}" for k, v in sections.items()])
+        raw = "\n\n".join([f"{k}\n{v}" for k, v in sections.items()])
         return {
             "sections": sections,
-            "raw_text": raw_text,
+            "raw_text": raw,
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "word_count": len(raw.split()),
         }
 
-    def generate_report(self, patient_data: dict, prediction: dict, trajectory: list, causal_graph: dict) -> Dict[str, object]:
-        prompt = self._build_prompt(patient_data, prediction, trajectory, causal_graph)
+    def generate_report(
+        self,
+        patient_data: dict[str, Any],
+        prediction: dict[str, Any],
+        trajectory: list[float],
+        causal_graph: dict[str, Any],
+        shap_values: list[dict[str, float]],
+    ) -> dict[str, Any]:
+        top_risk_factors = [f"{r['feature']} ({r['value']:+.4f})" for r in shap_values[:5]]
+        causal_summary = ", ".join([f"{x['variable']}:{x['strength']}" for x in causal_graph.get("top_causes_of_Diagnosis", [])])
+
+        prompt = f"""[INST] You are NeuroSynth, an advanced neurological AI assistant. Generate a detailed, structured clinical assessment.
+PATIENT PROFILE:
+Age: {patient_data.get('Age')} | Gender: {patient_data.get('Gender')} | Education: {patient_data.get('EducationLevel')} years
+BMI: {patient_data.get('BMI')} | Smoking: {patient_data.get('Smoking')} | Physical Activity: {patient_data.get('PhysicalActivity')}/10
+Sleep Quality: {patient_data.get('SleepQuality')}/10 | Diet Quality: {patient_data.get('DietQuality')}/10
+Family History of Alzheimer's: {patient_data.get('FamilyHistoryAlzheimers')}
+Cardiovascular Disease: {patient_data.get('CardiovascularDisease')} | Diabetes: {patient_data.get('Diabetes')} | Depression: {patient_data.get('Depression')}
+CLINICAL MEASUREMENTS:
+MMSE Score: {patient_data.get('MMSE')}/30 | Functional Assessment: {patient_data.get('FunctionalAssessment')}/10 | ADL Score: {patient_data.get('ADL')}/10
+Blood Pressure: {patient_data.get('SystolicBP')}/{patient_data.get('DiastolicBP')} mmHg
+Cholesterol: Total={patient_data.get('CholesterolTotal')} LDL={patient_data.get('CholesterolLDL')} HDL={patient_data.get('CholesterolHDL')} Triglycerides={patient_data.get('CholesterolTriglycerides')}
+SYMPTOMS:
+Memory Complaints: {patient_data.get('MemoryComplaints')} | Behavioral Problems: {patient_data.get('BehavioralProblems')}
+Confusion: {patient_data.get('Confusion')} | Disorientation: {patient_data.get('Disorientation')}
+Personality Changes: {patient_data.get('PersonalityChanges')} | Forgetfulness: {patient_data.get('Forgetfulness')}
+AI ANALYSIS RESULTS:
+Risk Probability: {prediction.get('probability', 0):.1%} ({prediction.get('risk_level', 'Unknown')} risk)
+Confidence: {prediction.get('confidence', 'Unknown')}
+Top Risk Factors by SHAP: {top_risk_factors}
+36-Month Trajectory: {trajectory}
+Causal Analysis: {causal_summary}
+Generate a comprehensive neurological assessment report with these sections:
+1. EXECUTIVE SUMMARY
+2. RISK ASSESSMENT & INTERPRETATION
+3. KEY BIOMARKER ANALYSIS (explain each major risk factor)
+4. 36-MONTH PROGRESSION FORECAST
+5. CAUSAL PATHWAY ANALYSIS
+6. MODIFIABLE RISK FACTORS & INTERVENTIONS (top 5 specific, actionable recommendations with expected impact)
+7. MONITORING PROTOCOL (specific biomarkers, frequency, thresholds)
+8. LIFESTYLE OPTIMIZATION PLAN
+9. UNCERTAINTY & LIMITATIONS
+Be specific, cite the patient's actual numbers, and make every recommendation actionable.
+IMPORTANT: This is a research tool. Always include disclaimer that clinical decisions require a physician. [/INST]"""
 
         if not self.hf_token:
-            return self._fallback_report(patient_data, prediction, trajectory, causal_graph)
+            return self._fallback_report(patient_data, prediction, trajectory, causal_graph, shap_values)
 
         headers = {"Authorization": f"Bearer {self.hf_token}"}
         payload = {
             "inputs": prompt,
             "parameters": {
-                "max_new_tokens": 800,
-                "temperature": 0.3,
+                "max_new_tokens": 900,
+                "temperature": 0.25,
                 "return_full_text": False,
             },
         }
 
         try:
-            response = requests.post(self.endpoint, headers=headers, json=payload, timeout=60)
-            response.raise_for_status()
-            data = response.json()
-
-            if isinstance(data, list) and data and isinstance(data[0], dict):
-                raw_text = data[0].get("generated_text", "")
-            elif isinstance(data, dict) and "generated_text" in data:
-                raw_text = data.get("generated_text", "")
+            resp = requests.post(self.endpoint, headers=headers, json=payload, timeout=90)
+            resp.raise_for_status()
+            body = resp.json()
+            if isinstance(body, list) and body and isinstance(body[0], dict):
+                raw_text = body[0].get("generated_text", "")
+            elif isinstance(body, dict):
+                raw_text = body.get("generated_text", str(body))
             else:
-                raw_text = str(data)
+                raw_text = str(body)
 
-            sections = self._parse_sections(raw_text)
+            sections = self._sections_from_text(raw_text)
             return {
                 "sections": sections,
                 "raw_text": raw_text,
                 "generated_at": datetime.now(timezone.utc).isoformat(),
+                "word_count": len(raw_text.split()),
             }
         except Exception:
-            return self._fallback_report(patient_data, prediction, trajectory, causal_graph)
+            return self._fallback_report(patient_data, prediction, trajectory, causal_graph, shap_values)

@@ -11,8 +11,10 @@ htmlcov/
 .DS_Store
 .env
 oasis_longitudinal.csv
+alzheimers_disease_data.csv
 frontend/node_modules/
 frontend/dist/
+models/.pkl
 models/*.pkl
 models/*.pt
 models/*.npy

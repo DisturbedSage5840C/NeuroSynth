@@ -1,22 +1,23 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Any
 
 import numpy as np
 import torch
 from torch import nn
 
 
-class _VariableMLP(nn.Module):
+class _NodeMLP(nn.Module):
     def __init__(self) -> None:
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(8, 32),
-            nn.ReLU(),
-            nn.Linear(32, 16),
-            nn.ReLU(),
-            nn.Linear(16, 1),
+            nn.Linear(10, 64),
+            nn.GELU(),
+            nn.Linear(64, 32),
+            nn.GELU(),
+            nn.Linear(32, 1),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -24,155 +25,216 @@ class _VariableMLP(nn.Module):
 
 
 class NeuralCausalDiscovery(nn.Module):
-    variables = ["Age", "EDUC", "SES", "MMSE", "CDR", "eTIV", "nWBV", "ASF"]
+    variables = [
+        "Age",
+        "MMSE",
+        "FunctionalAssessment",
+        "ADL",
+        "MemoryComplaints",
+        "BehavioralProblems",
+        "Depression",
+        "SleepQuality",
+        "PhysicalActivity",
+        "Diagnosis",
+    ]
 
     def __init__(self, models_dir: str | Path = "models") -> None:
         super().__init__()
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(parents=True, exist_ok=True)
 
-        self.W_logits = nn.Parameter(torch.zeros(8, 8))
-        self.mlps = nn.ModuleList([_VariableMLP() for _ in range(8)])
-        self._latest_W: np.ndarray | None = None
+        self.W_logits = nn.Parameter(torch.zeros(10, 10))
+        self.mlps = nn.ModuleList([_NodeMLP() for _ in range(10)])
+        self.latest_W: np.ndarray | None = None
+        self.min_vals: np.ndarray | None = None
+        self.max_vals: np.ndarray | None = None
 
     def get_adjacency(self) -> torch.Tensor:
         W = torch.sigmoid(self.W_logits)
-        W = W * (1 - torch.eye(8, device=W.device))
-        return W
+        W = W * (1 - torch.eye(10, device=W.device))
 
-    def acyclicity_constraint(self, W: torch.Tensor) -> torch.Tensor:
-        return torch.trace(torch.matrix_exp(W * W)) - 8
+        flat = W.flatten()
+        k = max(1, int(flat.numel() * 0.3))
+        threshold = torch.topk(flat, k).values.min()
+        mask = (W >= threshold).float()
+        return W * mask
+
+    @staticmethod
+    def acyclicity_constraint(W: torch.Tensor) -> torch.Tensor:
+        return torch.trace(torch.matrix_exp(W * W)) - 10
 
     def forward(self, X: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         W = self.get_adjacency()
-        preds = []
-        for j in range(8):
-            weighted_input = X * W[:, j]
-            preds.append(self.mlps[j](weighted_input))
-        X_hat = torch.cat(preds, dim=1)
+        outs = []
+        for j in range(10):
+            xj = X * W[:, j]
+            outs.append(self.mlps[j](xj))
+        X_hat = torch.cat(outs, dim=1)
         return X_hat, W
 
     def fit(
         self,
-        X_data: np.ndarray,
-        epochs: int = 500,
+        X: np.ndarray,
+        epochs: int = 1000,
+        outer_iters: int = 15,
+        inner_iters: int = 100,
         lr: float = 0.01,
         lambda1: float = 0.01,
-        lambda2: float = 5.0,
+        lambda2: float = 10.0,
     ) -> None:
-        X = torch.tensor(X_data, dtype=torch.float32)
-        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        X = np.asarray(X, dtype=np.float32)
+        self.min_vals = X.min(axis=0)
+        self.max_vals = X.max(axis=0)
 
-        outer_iters = 10
-        inner_iters = max(1, epochs // outer_iters)
+        X_t = torch.tensor(X, dtype=torch.float32)
+        optim = torch.optim.Adam(self.parameters(), lr=lr)
+
         alpha = torch.tensor(0.0)
-
         for _ in range(outer_iters):
             for _ in range(inner_iters):
-                optimizer.zero_grad()
-                X_hat, W = self.forward(X)
-                recon_loss = ((X_hat - X) ** 2).mean()
+                optim.zero_grad()
+                X_hat, W = self.forward(X_t)
+                recon = ((X_hat - X_t) ** 2).mean()
                 sparsity = lambda1 * torch.sum(torch.abs(W))
                 h = self.acyclicity_constraint(W)
-                loss = recon_loss + sparsity + alpha * h + 0.5 * lambda2 * (h ** 2)
+                loss = recon + sparsity + alpha * h + 0.5 * lambda2 * h * h
                 loss.backward()
-                optimizer.step()
+                optim.step()
             with torch.no_grad():
                 h_val = self.acyclicity_constraint(self.get_adjacency())
                 alpha = alpha + lambda2 * h_val
 
-        W_np = self.get_adjacency().detach().cpu().numpy()
-        self._latest_W = W_np
-        np.save(self.models_dir / "causal_graph.npy", W_np)
+        self.latest_W = self.get_adjacency().detach().cpu().numpy()
+        np.save(self.models_dir / "causal_graph.npy", self.latest_W)
+        (self.models_dir / "causal_vars.json").write_text(json.dumps(self.variables, indent=2), encoding="utf-8")
 
-    def get_causal_graph(self) -> Dict[str, object]:
-        if self._latest_W is None:
-            saved = self.models_dir / "causal_graph.npy"
-            if saved.exists():
-                self._latest_W = np.load(saved)
+    def _load_if_needed(self) -> None:
+        if self.latest_W is None:
+            graph_file = self.models_dir / "causal_graph.npy"
+            if graph_file.exists():
+                self.latest_W = np.load(graph_file)
             else:
-                self._latest_W = np.zeros((8, 8), dtype=float)
+                self.latest_W = np.zeros((10, 10), dtype=float)
 
-        W = self._latest_W
+    def get_causal_graph(self) -> dict[str, Any]:
+        self._load_if_needed()
+        W = self.latest_W
+        diag_idx = self.variables.index("Diagnosis")
+        mmse_idx = self.variables.index("MMSE")
+
         edges = []
         for i, src in enumerate(self.variables):
             for j, dst in enumerate(self.variables):
+                if i == j:
+                    continue
                 strength = float(W[i, j])
-                if i != j and strength > 0.3:
-                    edges.append({"from": src, "to": dst, "strength": round(strength, 4)})
+                if strength > 0.25:
+                    edge_type = "direct" if abs(i - j) <= 2 else "indirect"
+                    edges.append(
+                        {
+                            "from": src,
+                            "to": dst,
+                            "strength": round(strength, 4),
+                            "type": edge_type,
+                        }
+                    )
 
-        cdr_idx = self.variables.index("CDR")
-        mmse_idx = self.variables.index("MMSE")
-
-        def _top_causes(target_idx: int) -> List[Dict[str, float]]:
-            causes = []
+        def top_causes(target_idx: int, k: int) -> list[dict[str, float]]:
+            vals = []
             for i, name in enumerate(self.variables):
                 if i == target_idx:
                     continue
-                causes.append({"variable": name, "strength": float(W[i, target_idx])})
-            causes.sort(key=lambda x: x["strength"], reverse=True)
-            return [{"variable": c["variable"], "strength": round(c["strength"], 4)} for c in causes[:3]]
+                vals.append((name, float(W[i, target_idx])))
+            vals.sort(key=lambda x: x[1], reverse=True)
+            return [{"variable": n, "strength": round(s, 4)} for n, s in vals[:k]]
 
-        top_cdr = _top_causes(cdr_idx)
-        top_mmse = _top_causes(mmse_idx)
+        top_d = top_causes(diag_idx, 4)
+        top_m = top_causes(mmse_idx, 3)
 
-        modifiable_set = {"MMSE", "SES", "EDUC"}
-        modifiable_interventions = [
-            item["variable"] for item in top_cdr if item["variable"] in modifiable_set and item["strength"] > 0
-        ]
+        protective = []
+        amplifiers = []
+        modifiable = []
+        for name, eff in [(self.variables[i], float(W[i, diag_idx])) for i in range(len(self.variables)) if i != diag_idx]:
+            if name in {"PhysicalActivity", "SleepQuality", "MMSE", "FunctionalAssessment", "ADL", "Depression"}:
+                if eff < 0.35:
+                    protective.append({"variable": name, "effect": round(-abs(eff), 4)})
+                if eff > 0.45:
+                    amplifiers.append({"variable": name, "effect": round(eff, 4)})
+                modifiable.append(
+                    {
+                        "variable": name,
+                        "current_effect": round(eff, 4),
+                        "intervention_direction": "increase" if name in {"PhysicalActivity", "SleepQuality", "MMSE", "FunctionalAssessment", "ADL"} else "decrease",
+                        "expected_impact": "Potential reduction in modeled diagnosis risk",
+                    }
+                )
 
         return {
+            "variables": self.variables,
             "edges": sorted(edges, key=lambda x: x["strength"], reverse=True),
-            "top_causes_of_CDR": top_cdr,
-            "top_causes_of_MMSE": top_mmse,
-            "modifiable_interventions": modifiable_interventions,
+            "adjacency_matrix": np.round(W, 4).tolist(),
+            "top_causes_of_Diagnosis": top_d,
+            "top_causes_of_MMSE": top_m,
+            "protective_factors": protective,
+            "risk_amplifiers": amplifiers,
+            "modifiable_interventions": modifiable,
         }
 
     def simulate_intervention(
         self,
         variable: str,
-        new_value: float,
-        current_patient_data: Dict[str, float],
-    ) -> Dict[str, object]:
-        graph = self.get_causal_graph()
-        W = self._latest_W if self._latest_W is not None else np.zeros((8, 8))
-
-        var_to_payload = {
-            "Age": "age",
-            "EDUC": "educ",
-            "SES": "ses",
-            "MMSE": "mmse",
-            "CDR": "cdr",
-            "eTIV": "etiv",
-            "nWBV": "nwbv",
-            "ASF": "asf",
-        }
-
-        x = np.array([float(current_patient_data[var_to_payload[v]]) for v in self.variables], dtype=float)
-        cdr_idx = self.variables.index("CDR")
-
-        incoming = W[:, cdr_idx]
-        original_score = (x[cdr_idx] / 3.0) + float(np.dot(incoming, x) / (len(x) * 2.0))
-        original_risk = float(np.clip(1.0 / (1.0 + np.exp(-original_score)), 0.0, 1.0))
-
+        new_value_normalized: float,
+        patient_data: dict[str, float],
+    ) -> dict[str, Any]:
+        self._load_if_needed()
         if variable not in self.variables:
-            raise ValueError(f"Unknown intervention variable: {variable}")
+            raise ValueError(f"Unknown variable: {variable}")
 
-        x_intervened = x.copy()
-        x_intervened[self.variables.index(variable)] = float(new_value)
-        intervened_score = (x_intervened[cdr_idx] / 3.0) + float(np.dot(incoming, x_intervened) / (len(x_intervened) * 2.0))
-        intervened_risk = float(np.clip(1.0 / (1.0 + np.exp(-intervened_score)), 0.0, 1.0))
+        idx_map = {v: i for i, v in enumerate(self.variables)}
+        x = np.zeros(10, dtype=float)
+        for v in self.variables:
+            if v == "Diagnosis":
+                x[idx_map[v]] = 0.0
+            else:
+                x[idx_map[v]] = float(patient_data.get(v, 0.0))
 
-        improvement = original_risk - intervened_risk
-        direction = "improves" if improvement > 0 else "worsens"
+        if self.min_vals is None or self.max_vals is None:
+            self.min_vals = np.zeros(10)
+            self.max_vals = np.ones(10)
+
+        denom = np.where((self.max_vals - self.min_vals) == 0, 1.0, self.max_vals - self.min_vals)
+        x_norm = (x - self.min_vals) / denom
+        x_norm = np.clip(x_norm, 0.0, 1.0)
+
+        diag_idx = idx_map["Diagnosis"]
+
+        incoming = self.latest_W[:, diag_idx]
+        original_score = float(np.dot(incoming, x_norm))
+        original_risk = float(1.0 / (1.0 + np.exp(-original_score)))
+
+        x_new = x_norm.copy()
+        x_new[idx_map[variable]] = float(np.clip(new_value_normalized, 0.0, 1.0))
+        intervened_score = float(np.dot(incoming, x_new))
+        intervened_risk = float(1.0 / (1.0 + np.exp(-intervened_score)))
+
+        arr = np.abs(self.latest_W[idx_map[variable], :])
+        top_downstream_idx = np.argsort(arr)[::-1][:4]
+        downstream = [self.variables[i] for i in top_downstream_idx if i != idx_map[variable] and arr[i] > 0.1]
+
+        absolute_reduction = max(0.0, original_risk - intervened_risk)
+        relative_reduction = (absolute_reduction / max(original_risk, 1e-6)) * 100.0
+
         interpretation = (
-            f"Adjusting {variable} to {new_value:.2f} {direction} estimated CDR-linked risk by {abs(improvement):.3f}. "
-            f"This estimate is derived from learned causal strengths and should be interpreted as directional evidence."
+            f"Adjusting {variable} to normalized value {new_value_normalized:.2f} is estimated to change modeled "
+            f"Alzheimer's risk from {original_risk:.1%} to {intervened_risk:.1%}. "
+            f"Estimated absolute reduction is {absolute_reduction:.1%} through downstream effects on {', '.join(downstream) if downstream else 'key cognitive pathways'}."
         )
 
         return {
-            "original_CDR_risk": round(original_risk, 4),
-            "intervened_CDR_risk": round(intervened_risk, 4),
-            "estimated_improvement": round(improvement, 4),
+            "original_risk": round(original_risk, 4),
+            "intervened_risk": round(intervened_risk, 4),
+            "absolute_risk_reduction": round(absolute_reduction, 4),
+            "relative_risk_reduction_pct": round(relative_reduction, 2),
+            "affected_downstream_vars": downstream,
             "interpretation": interpretation,
         }

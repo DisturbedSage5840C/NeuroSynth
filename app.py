@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List
+from typing import Any
 
 import gradio as gr
 import pandas as pd
@@ -12,25 +12,62 @@ from backend.data_pipeline import DataPipeline
 from backend.report_generator import ClinicalReportGenerator
 from backend.temporal_model import TemporalProgressionModel
 
+STATE: dict[str, Any] = {}
 
-STATE: Dict[str, object] = {}
+FIELDS = [
+    "Age", "Gender", "Ethnicity", "EducationLevel", "BMI", "Smoking", "AlcoholConsumption",
+    "PhysicalActivity", "DietQuality", "SleepQuality", "FamilyHistoryAlzheimers", "CardiovascularDisease",
+    "Diabetes", "Depression", "HeadInjury", "Hypertension", "SystolicBP", "DiastolicBP",
+    "CholesterolTotal", "CholesterolLDL", "CholesterolHDL", "CholesterolTriglycerides", "MMSE",
+    "FunctionalAssessment", "MemoryComplaints", "BehavioralProblems", "ADL", "Confusion",
+    "Disorientation", "PersonalityChanges", "DifficultyCompletingTasks", "Forgetfulness",
+]
+
+DEFAULTS = {
+    "Age": 73, "Gender": 1, "Ethnicity": 1, "EducationLevel": 1, "BMI": 27.4, "Smoking": 0,
+    "AlcoholConsumption": 3.2, "PhysicalActivity": 4.8, "DietQuality": 5.2, "SleepQuality": 5.0,
+    "FamilyHistoryAlzheimers": 1, "CardiovascularDisease": 0, "Diabetes": 0, "Depression": 0,
+    "HeadInjury": 0, "Hypertension": 1, "SystolicBP": 132, "DiastolicBP": 82,
+    "CholesterolTotal": 202, "CholesterolLDL": 124, "CholesterolHDL": 49, "CholesterolTriglycerides": 166,
+    "MMSE": 24, "FunctionalAssessment": 6.2, "MemoryComplaints": 1, "BehavioralProblems": 0, "ADL": 6.0,
+    "Confusion": 0, "Disorientation": 0, "PersonalityChanges": 0, "DifficultyCompletingTasks": 1,
+    "Forgetfulness": 1,
+}
+
+RANGES = {
+    "Age": (45, 100, 1), "Gender": (0, 2, 1), "Ethnicity": (0, 3, 1), "EducationLevel": (0, 3, 1),
+    "BMI": (15, 45, 0.1), "Smoking": (0, 1, 1), "AlcoholConsumption": (0, 20, 0.1),
+    "PhysicalActivity": (0, 10, 0.1), "DietQuality": (0, 10, 0.1), "SleepQuality": (0, 10, 0.1),
+    "FamilyHistoryAlzheimers": (0, 1, 1), "CardiovascularDisease": (0, 1, 1), "Diabetes": (0, 1, 1),
+    "Depression": (0, 1, 1), "HeadInjury": (0, 1, 1), "Hypertension": (0, 1, 1),
+    "SystolicBP": (80, 220, 1), "DiastolicBP": (40, 140, 1), "CholesterolTotal": (100, 400, 1),
+    "CholesterolLDL": (40, 300, 1), "CholesterolHDL": (20, 120, 1), "CholesterolTriglycerides": (40, 500, 1),
+    "MMSE": (0, 30, 1), "FunctionalAssessment": (0, 10, 0.1), "MemoryComplaints": (0, 1, 1),
+    "BehavioralProblems": (0, 1, 1), "ADL": (0, 10, 0.1), "Confusion": (0, 1, 1),
+    "Disorientation": (0, 1, 1), "PersonalityChanges": (0, 1, 1), "DifficultyCompletingTasks": (0, 1, 1),
+    "Forgetfulness": (0, 1, 1),
+}
 
 
-def _init_pipeline() -> None:
+def _init() -> None:
     pipeline = DataPipeline()
-    X_train, X_test, y_train, y_test, feature_names, scaler, patient_sequences = pipeline.process()
+    X_train, X_test, y_train, y_test, feature_names, scaler, dataset_stats = pipeline.process()
 
-    predictor = BiomarkerPredictor(feature_names=feature_names)
-    predictor.train(X_train, y_train)
+    predictor = BiomarkerPredictor(feature_names)
+    predictor.train(X_train.values, y_train.values)
 
-    temporal = TemporalProgressionModel(fallback_predictor=lambda x: predictor.predict(x)["probability"])
-    temporal.train_model(patient_sequences=patient_sequences, labels=pipeline.subject_labels, epochs=50, lr=0.001)
+    temporal = TemporalProgressionModel(feature_names)
+    temporal.train_model(X_train.values, y_train.values)
 
     causal = NeuralCausalDiscovery()
-    causal.fit(pd.concat([pd.DataFrame(X_train), pd.DataFrame(X_test)]).values, epochs=500, lr=0.01, lambda1=0.01, lambda2=5.0)
+    if pipeline.df_processed is not None:
+        causal_cols = [c for c in causal.variables if c in pipeline.df_processed.columns]
+        if len(causal_cols) == len(causal.variables):
+            causal.fit(pipeline.df_processed[causal.variables].values.astype(float))
 
-    reporter = ClinicalReportGenerator(os.getenv("HF_TOKEN"))
+    reporter = ClinicalReportGenerator(os.getenv("HF_TOKEN", ""))
 
+    metrics = predictor.evaluate(X_test.values, y_test.values)
     STATE.update(
         {
             "pipeline": pipeline,
@@ -40,138 +77,137 @@ def _init_pipeline() -> None:
             "reporter": reporter,
             "scaler": scaler,
             "feature_names": feature_names,
-            "X_test": X_test,
-            "y_test": y_test,
+            "dataset_stats": dataset_stats,
+            "metrics": metrics,
         }
     )
 
 
-def _patient_payload(age, educ, ses, mmse, cdr, etiv, nwbv, asf) -> Dict[str, float]:
+def _to_payload(values: list[float]) -> dict[str, float]:
+    return {k: float(v) for k, v in zip(FIELDS, values)}
+
+
+def analyze(*values: float):
+    payload = _to_payload(list(values))
+    frame = pd.DataFrame([payload])
+    scaled = STATE["scaler"].transform(frame[STATE["feature_names"]])
+
+    pred = STATE["predictor"].predict(scaled)
+    traj = STATE["temporal"].predict_trajectory(frame[STATE["feature_names"]].values[0], pred["probability"])
+    traj_df = pd.DataFrame({"month": [6, 12, 18, 24, 30, 36], "risk": traj["trajectory"]})
+
     return {
-        "age": float(age),
-        "educ": float(educ),
-        "ses": float(ses),
-        "mmse": float(mmse),
-        "cdr": float(cdr),
-        "etiv": float(etiv),
-        "nwbv": float(nwbv),
-        "asf": float(asf),
-    }
+        **pred,
+        "trajectory": traj["trajectory"],
+        "confidence_bands": traj["confidence_bands"],
+    }, traj_df
 
 
-def analyze_patient(age, educ, ses, mmse, cdr, etiv, nwbv, asf):
-    payload = _patient_payload(age, educ, ses, mmse, cdr, etiv, nwbv, asf)
-    raw_vec = [payload[k] for k in ["age", "educ", "ses", "mmse", "cdr", "etiv", "nwbv", "asf"]]
-    scaled = STATE["scaler"].transform([raw_vec])
+def clinical_report(*values: float):
+    payload = _to_payload(list(values))
+    frame = pd.DataFrame([payload])
+    scaled = STATE["scaler"].transform(frame[STATE["feature_names"]])
 
-    prediction = STATE["predictor"].predict(scaled)
-    trajectory = STATE["temporal"].predict_trajectory([scaled.flatten().tolist()])
-    months = [6, 12, 18, 24, 30, 36]
-    trajectory_df = pd.DataFrame({"month": months, "risk": trajectory})
+    pred = STATE["predictor"].predict(scaled)
+    traj = STATE["temporal"].predict_trajectory(frame[STATE["feature_names"]].values[0], pred["probability"])
+    shap_vals = STATE["predictor"].get_shap_values(scaled[:1])[0]
+    top_idx = list(abs(shap_vals).argsort()[::-1][:5])
+    shap_top = [{"feature": STATE["feature_names"][i], "value": float(shap_vals[i])} for i in top_idx]
 
-    result = {
-        "prediction": prediction["prediction"],
-        "probability": prediction["probability"],
-        "confidence": prediction["confidence"],
-        "risk_level": prediction["risk_level"],
-        "trajectory": trajectory,
-        "feature_importance": STATE["predictor"].get_feature_importance(),
-    }
-    return result, trajectory_df
-
-
-def generate_report(age, educ, ses, mmse, cdr, etiv, nwbv, asf):
-    payload = _patient_payload(age, educ, ses, mmse, cdr, etiv, nwbv, asf)
-    raw_vec = [payload[k] for k in ["age", "educ", "ses", "mmse", "cdr", "etiv", "nwbv", "asf"]]
-    scaled = STATE["scaler"].transform([raw_vec])
-
-    prediction = STATE["predictor"].predict(scaled)
-    trajectory = STATE["temporal"].predict_trajectory([scaled.flatten().tolist()])
-    graph = STATE["causal"].get_causal_graph()
-
-    report = STATE["reporter"].generate_report(payload, prediction, trajectory, graph)
-    md_sections = []
-    for title, content in report["sections"].items():
-        md_sections.append(f"### {title}\n{content}")
-    return "\n\n".join(md_sections)
-
-
-def causal_table_and_summary():
-    graph = STATE["causal"].get_causal_graph()
-    edges = graph.get("edges", [])
-    edge_df = pd.DataFrame(edges) if edges else pd.DataFrame(columns=["from", "to", "strength"])
-
-    summary = (
-        "### Top causes of CDR\n"
-        + "\n".join([f"- {x['variable']} ({x['strength']})" for x in graph.get("top_causes_of_CDR", [])])
-        + "\n\n### Top causes of MMSE\n"
-        + "\n".join([f"- {x['variable']} ({x['strength']})" for x in graph.get("top_causes_of_MMSE", [])])
-        + "\n\n### Modifiable interventions\n"
-        + "\n".join([f"- {x}" for x in graph.get("modifiable_interventions", [])])
+    report = STATE["reporter"].generate_report(
+        patient_data=payload,
+        prediction=pred,
+        trajectory=traj["trajectory"],
+        causal_graph=STATE["causal"].get_causal_graph(),
+        shap_values=shap_top,
     )
-    return edge_df, summary
+
+    md = []
+    for title, content in report["sections"].items():
+        md.append(f"### {title}\n{content}")
+    return "\n\n".join(md)
 
 
-_init_pipeline()
+def show_causal():
+    graph = STATE["causal"].get_causal_graph()
+    edges = pd.DataFrame(graph.get("edges", []))
+    insight = (
+        "### Top Causes of Diagnosis\n"
+        + "\n".join([f"- {x['variable']} ({x['strength']})" for x in graph.get("top_causes_of_Diagnosis", [])])
+        + "\n\n### Protective Factors\n"
+        + "\n".join([f"- {x['variable']} ({x['effect']})" for x in graph.get("protective_factors", [])])
+        + "\n\n### Risk Amplifiers\n"
+        + "\n".join([f"- {x['variable']} ({x['effect']})" for x in graph.get("risk_amplifiers", [])])
+    )
+    return edges, insight
+
+
+def perf_text():
+    m = STATE["metrics"]
+    return (
+        f"## Model Performance\n"
+        f"- Accuracy: {m['accuracy']}\n"
+        f"- F1 Weighted: {m['f1_weighted']}\n"
+        f"- ROC-AUC: {m['roc_auc']}\n"
+        f"- Precision: {m['precision']}\n"
+        f"- Recall: {m['recall']}\n"
+    )
+
+
+_init()
 
 with gr.Blocks(
-    title="🧠 NeuroSynth — Neurological Deterioration Prediction Engine",
-    theme=gr.themes.Soft(primary_hue="cyan", secondary_hue="violet"),
-    css="body { background: #0a0a0f; } .gradio-container { background: #0a0a0f !important; }",
+    title="🧠 NeuroSynth — Advanced Neurological AI Platform",
+    theme=gr.themes.Soft(),
 ) as demo:
-    gr.Markdown("# 🧠 NeuroSynth — Neurological Deterioration Prediction Engine")
+    gr.Markdown("# 🧠 NeuroSynth — Advanced Neurological AI Platform")
     gr.Markdown(
-        "Use Patient Analysis for prediction and trajectory, Clinical Report for AI-generated assessment, "
-        "and Causal Analysis for directional biomarker insights."
+        "- 4-model ensemble biomarker prediction\n"
+        "- Pseudo-longitudinal LSTM progression forecasting\n"
+        "- Neural causal discovery + intervention simulation\n"
+        "- LLM-generated structured neurological reports"
     )
 
-    with gr.Tab("Patient Analysis"):
-        with gr.Row():
-            age = gr.Slider(50, 100, value=74, step=1, label="Age")
-            educ = gr.Slider(0, 25, value=14, step=1, label="EDUC")
-            ses = gr.Slider(1, 5, value=2, step=1, label="SES")
-            mmse = gr.Slider(0, 30, value=24, step=1, label="MMSE")
-        with gr.Row():
-            cdr = gr.Slider(0, 3, value=0.5, step=0.5, label="CDR")
-            etiv = gr.Slider(900, 2000, value=1450, step=1, label="eTIV")
-            nwbv = gr.Slider(0.6, 0.9, value=0.72, step=0.001, label="nWBV")
-            asf = gr.Slider(0.8, 1.8, value=1.2, step=0.001, label="ASF")
+    sliders: list[gr.Slider] = []
 
+    def make_inputs():
+        groups = {
+            "Demographics": ["Age", "Gender", "Ethnicity", "EducationLevel"],
+            "Lifestyle": ["BMI", "Smoking", "AlcoholConsumption", "PhysicalActivity", "DietQuality", "SleepQuality"],
+            "Medical History": ["FamilyHistoryAlzheimers", "CardiovascularDisease", "Diabetes", "Depression", "HeadInjury", "Hypertension"],
+            "Clinical Measurements": ["SystolicBP", "DiastolicBP", "CholesterolTotal", "CholesterolLDL", "CholesterolHDL", "CholesterolTriglycerides", "MMSE", "FunctionalAssessment", "ADL"],
+            "Symptoms": ["MemoryComplaints", "BehavioralProblems", "Confusion", "Disorientation", "PersonalityChanges", "DifficultyCompletingTasks", "Forgetfulness"],
+        }
+        local = []
+        for section, names in groups.items():
+            gr.Markdown(f"### {section}")
+            with gr.Row():
+                for n in names:
+                    lo, hi, st = RANGES[n]
+                    local.append(gr.Slider(lo, hi, value=DEFAULTS[n], step=st, label=n))
+        return local
+
+    with gr.Tab("🔬 Patient Analysis"):
+        sliders = make_inputs()
         analyze_btn = gr.Button("Analyze", variant="primary")
-        analyze_json = gr.JSON(label="Prediction Results")
-        traj_plot = gr.LinePlot(x="month", y="risk", title="36-Month Risk Trajectory")
-        analyze_btn.click(
-            analyze_patient,
-            inputs=[age, educ, ses, mmse, cdr, etiv, nwbv, asf],
-            outputs=[analyze_json, traj_plot],
-        )
+        pred_json = gr.JSON(label="Prediction")
+        traj_plot = gr.LinePlot(x="month", y="risk", title="36-Month Trajectory")
+        analyze_btn.click(analyze, inputs=sliders, outputs=[pred_json, traj_plot])
 
-    with gr.Tab("Clinical Report"):
-        with gr.Row():
-            age_r = gr.Slider(50, 100, value=74, step=1, label="Age")
-            educ_r = gr.Slider(0, 25, value=14, step=1, label="EDUC")
-            ses_r = gr.Slider(1, 5, value=2, step=1, label="SES")
-            mmse_r = gr.Slider(0, 30, value=24, step=1, label="MMSE")
-        with gr.Row():
-            cdr_r = gr.Slider(0, 3, value=0.5, step=0.5, label="CDR")
-            etiv_r = gr.Slider(900, 2000, value=1450, step=1, label="eTIV")
-            nwbv_r = gr.Slider(0.6, 0.9, value=0.72, step=0.001, label="nWBV")
-            asf_r = gr.Slider(0.8, 1.8, value=1.2, step=0.001, label="ASF")
-
+    with gr.Tab("📋 Clinical Report"):
+        report_inputs = make_inputs()
         report_btn = gr.Button("Generate Report", variant="primary")
         report_md = gr.Markdown()
-        report_btn.click(
-            generate_report,
-            inputs=[age_r, educ_r, ses_r, mmse_r, cdr_r, etiv_r, nwbv_r, asf_r],
-            outputs=report_md,
-        )
+        report_btn.click(clinical_report, inputs=report_inputs, outputs=report_md)
 
-    with gr.Tab("Causal Analysis"):
-        causal_btn = gr.Button("Show Causal Graph", variant="primary")
-        causal_df = gr.Dataframe(label="Causal Edges", headers=["from", "to", "strength"], interactive=False)
-        causal_md = gr.Markdown()
-        causal_btn.click(causal_table_and_summary, inputs=None, outputs=[causal_df, causal_md])
+    with gr.Tab("🕸️ Causal Network"):
+        graph_btn = gr.Button("Show Graph", variant="primary")
+        edges_df = gr.Dataframe(label="Causal Edges", interactive=False)
+        insight_md = gr.Markdown()
+        graph_btn.click(show_causal, inputs=None, outputs=[edges_df, insight_md])
 
+    with gr.Tab("📊 Model Performance"):
+        perf_md = gr.Markdown(perf_text())
 
 if __name__ == "__main__":
     demo.launch()

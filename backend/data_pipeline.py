@@ -1,79 +1,108 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any
 
 import joblib
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 
 class DataPipeline:
-    """Load and preprocess OASIS longitudinal data for NeuroSynth."""
+    """Data pipeline for alzheimers_disease_data.csv with 34-feature schema."""
 
-    feature_columns = ["Age", "EDUC", "SES", "MMSE", "CDR", "eTIV", "nWBV", "ASF"]
-    target_column = "Group"
+    target_column = "Diagnosis"
+    drop_columns = ["PatientID", "DoctorInCharge"]
+    categorical_columns = ["Gender", "Ethnicity", "EducationLevel"]
 
-    def __init__(self, csv_path: str | None = None) -> None:
-        self.csv_path = Path(csv_path) if csv_path else self._resolve_csv_path()
-        self.models_dir = self._resolve_models_dir()
-        self.df_clean: pd.DataFrame | None = None
-        self.subject_labels: Dict[str, int] = {}
+    def __init__(self, csv_path: str | None = None, models_dir: str | Path = "models") -> None:
+        self.csv_path = Path(csv_path) if csv_path else Path("alzheimers_disease_data.csv")
+        self.models_dir = Path(models_dir)
+        self.models_dir.mkdir(parents=True, exist_ok=True)
+
+        self.df_raw: pd.DataFrame | None = None
+        self.df_processed: pd.DataFrame | None = None
+        self.feature_names: list[str] = []
         self.scaler: StandardScaler | None = None
+        self.dataset_stats: dict[str, Any] = {}
 
-    def _resolve_csv_path(self) -> Path:
-        candidates = [
-            Path.cwd() / "oasis_longitudinal.csv",
-            Path(__file__).resolve().parent.parent / "oasis_longitudinal.csv",
-            Path("/app/oasis_longitudinal.csv"),
-        ]
-        for path in candidates:
-            if path.exists():
-                return path
-        raise FileNotFoundError("oasis_longitudinal.csv not found in expected locations")
+    def _load(self) -> pd.DataFrame:
+        if not self.csv_path.exists():
+            raise FileNotFoundError(
+                f"Dataset not found: {self.csv_path}. Place alzheimers_disease_data.csv in repo root."
+            )
+        return pd.read_csv(self.csv_path)
 
-    def _resolve_models_dir(self) -> Path:
-        candidates = [Path.cwd() / "models", Path(__file__).resolve().parent.parent / "models", Path("/app/models")]
-        for path in candidates:
-            if path.exists() or path.parent.exists():
-                path.mkdir(parents=True, exist_ok=True)
-                return path
-        fallback = Path.cwd() / "models"
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback
+    @staticmethod
+    def _safe_stats(series: pd.Series) -> dict[str, float]:
+        return {
+            "mean": round(float(series.mean()), 4),
+            "std": round(float(series.std(ddof=0)), 4),
+            "min": round(float(series.min()), 4),
+            "max": round(float(series.max()), 4),
+        }
 
-    def _clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        df = df.copy()
-        df = df[df[self.target_column] != "Converted"]
-        df["SES"] = df["SES"].fillna(df["SES"].median())
-        df["MMSE"] = df["MMSE"].fillna(df["MMSE"].median())
-        df["nWBV"] = df["nWBV"].fillna(df["nWBV"].mean())
-        df = df.dropna(subset=self.feature_columns + [self.target_column, "Subject ID", "Visit"])
-        df["target"] = df[self.target_column].map({"Demented": 1, "Nondemented": 0}).astype(int)
-        return df
+    def _encode_categoricals(self, df: pd.DataFrame) -> pd.DataFrame:
+        encoded = df.copy()
+        for col in self.categorical_columns:
+            if col in encoded.columns:
+                encoded[col] = encoded[col].astype(str).str.strip().str.lower()
+                encoded[col], _ = pd.factorize(encoded[col], sort=True)
+        return encoded
 
-    def _build_patient_sequences(self, df: pd.DataFrame) -> Dict[str, List[List[float]]]:
-        sequences: Dict[str, List[List[float]]] = {}
-        for subject_id, subject_df in df.groupby("Subject ID"):
-            sorted_df = subject_df.sort_values("Visit")
-            vectors = sorted_df[self.feature_columns].astype(float).values.tolist()
-            sequences[str(subject_id)] = vectors
-            self.subject_labels[str(subject_id)] = int(sorted_df["target"].iloc[-1])
-        return sequences
+    def _build_dataset_stats(self, df: pd.DataFrame, features: list[str]) -> dict[str, Any]:
+        n_total = int(len(df))
+        n_alz = int((df[self.target_column] == 1).sum())
+        n_healthy = int((df[self.target_column] == 0).sum())
+        pct = round((n_alz / n_total) * 100.0, 2) if n_total else 0.0
+
+        distributions: dict[str, dict[str, float]] = {}
+        for col in features:
+            distributions[col] = self._safe_stats(df[col])
+
+        return {
+            "n_patients": n_total,
+            "n_alzheimers": n_alz,
+            "n_healthy": n_healthy,
+            "pct_alzheimers": pct,
+            "mean_age": round(float(df["Age"].mean()), 4) if "Age" in df.columns else 0.0,
+            "mean_mmse": round(float(df["MMSE"].mean()), 4) if "MMSE" in df.columns else 0.0,
+            "feature_distributions": distributions,
+        }
 
     def process(
         self,
         test_size: float = 0.2,
         random_state: int = 42,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, List[str], StandardScaler, Dict[str, List[List[float]]]]:
-        raw_df = pd.read_csv(self.csv_path)
-        df = self._clean_dataframe(raw_df)
-        self.df_clean = df
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, list[str], StandardScaler, dict[str, Any]]:
+        df = self._load()
+        self.df_raw = df.copy()
 
-        X = df[self.feature_columns].astype(float).values
-        y = df["target"].values
+        for col in self.drop_columns:
+            if col in df.columns:
+                df = df.drop(columns=[col])
+
+        if self.target_column not in df.columns:
+            raise ValueError("Diagnosis target column is missing from dataset")
+
+        df = self._encode_categoricals(df)
+
+        numeric_cols = df.columns.tolist()
+        for col in numeric_cols:
+            if col == self.target_column:
+                continue
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+            median_val = df[col].median()
+            df[col] = df[col].fillna(median_val)
+
+        df[self.target_column] = pd.to_numeric(df[self.target_column], errors="coerce").fillna(0).astype(int)
+
+        feature_names = [c for c in df.columns if c != self.target_column]
+        self.feature_names = feature_names
+
+        X = df[feature_names]
+        y = df[self.target_column]
 
         X_train_raw, X_test_raw, y_train, y_test = train_test_split(
             X,
@@ -84,13 +113,13 @@ class DataPipeline:
         )
 
         scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train_raw)
-        X_test = scaler.transform(X_test_raw)
+        X_train = pd.DataFrame(scaler.fit_transform(X_train_raw), columns=feature_names, index=X_train_raw.index)
+        X_test = pd.DataFrame(scaler.transform(X_test_raw), columns=feature_names, index=X_test_raw.index)
+
         self.scaler = scaler
+        self.df_processed = df
+        self.dataset_stats = self._build_dataset_stats(df, feature_names)
 
-        patient_sequences = self._build_patient_sequences(df)
+        joblib.dump(scaler, self.models_dir / "scaler.pkl")
 
-        scaler_path = self.models_dir / "scaler.pkl"
-        joblib.dump(scaler, scaler_path)
-
-        return X_train, X_test, y_train, y_test, self.feature_columns, scaler, patient_sequences
+        return X_train, X_test, y_train, y_test, feature_names, scaler, self.dataset_stats
