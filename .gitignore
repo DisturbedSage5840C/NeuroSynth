@@ -20,3 +20,5 @@ models/*.pt
 models/*.npy
 artifacts/
 mlruns/
+dump.rdb
+static/
