@@ -45,7 +45,7 @@ jobs:
 
       - name: Run unit tests with coverage
         env:
-          PYTHONPATH: src
+          PYTHONPATH: .:src
         run: pytest -q --cov
 
       - name: Release gate
@@ -101,7 +101,7 @@ jobs:
 
       - name: Run unit tests with coverage
         env:
-          PYTHONPATH: src
+          PYTHONPATH: .:src
         run: pytest -q --cov
 
       - name: Release gate
