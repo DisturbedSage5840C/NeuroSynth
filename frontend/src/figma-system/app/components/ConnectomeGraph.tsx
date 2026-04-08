@@ -1,139 +1,101 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { connectomeNodes, connectomeEdges } from '../data/mock-data';
-import { UncertaintyBadge } from './UncertaintyBadge';
+import { useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import type { ConnectomeNode, ConnectomeEdge } from '../data/mock-data';
+import { connectomeData } from '../data/mock-data';
 
 export function ConnectomeGraph() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; activity: number } | null>(null);
-  const animRef = useRef(0);
-
-  const regionColors: Record<string, string> = {
-    frontal: '#818cf8', parietal: '#34d399', occipital: '#f59e0b',
-    temporal: '#ec4899', limbic: '#06b6d4', subcortical: '#a78bfa', cerebellum: '#fb923c',
-  };
-
-  const draw = useCallback((time: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const w = canvas.width;
-    const h = canvas.height;
-    const scaleX = w / 500;
-    const scaleY = h / 360;
-
-    ctx.clearRect(0, 0, w, h);
-
-    // Draw edges
-    connectomeEdges.forEach(edge => {
-      const src = connectomeNodes.find(n => n.id === edge.source)!;
-      const tgt = connectomeNodes.find(n => n.id === edge.target)!;
-      const isHovered = hoveredNode === edge.source || hoveredNode === edge.target;
-      const pulse = Math.sin(time / 1000 + edge.weight * 10) * 0.3 + 0.7;
-
-      ctx.beginPath();
-      ctx.moveTo(src.x * scaleX, src.y * scaleY);
-      ctx.lineTo(tgt.x * scaleX, tgt.y * scaleY);
-      ctx.strokeStyle = isHovered
-        ? `rgba(129,140,248,${0.6 * pulse})`
-        : `rgba(255,255,255,${0.06 + edge.weight * 0.08 * pulse})`;
-      ctx.lineWidth = isHovered ? 2 : edge.weight * 1.5;
-      ctx.stroke();
-    });
-
-    // Draw nodes
-    connectomeNodes.forEach(node => {
-      const x = node.x * scaleX;
-      const y = node.y * scaleY;
-      const isHovered = hoveredNode === node.id;
-      const radius = 4 + node.activity * 8 + (isHovered ? 3 : 0);
-      const pulse = Math.sin(time / 800 + node.activity * 5) * 2;
-      const color = regionColors[node.region] || '#818cf8';
-
-      // Glow
-      if (node.activity > 0.7) {
-        const glow = ctx.createRadialGradient(x, y, 0, x, y, radius + 8 + pulse);
-        glow.addColorStop(0, color + '40');
-        glow.addColorStop(1, color + '00');
-        ctx.beginPath();
-        ctx.arc(x, y, radius + 8 + pulse, 0, Math.PI * 2);
-        ctx.fillStyle = glow;
-        ctx.fill();
-      }
-
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = isHovered ? color : color + 'cc';
-      ctx.fill();
-      ctx.strokeStyle = isHovered ? '#fff' : color + '60';
-      ctx.lineWidth = isHovered ? 2 : 1;
-      ctx.stroke();
-    });
-
-    animRef.current = requestAnimationFrame(draw);
-  }, [hoveredNode]);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
-    animRef.current = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [draw]);
+    if (!svgRef.current) return;
+    const { nodes, edges } = connectomeData;
+    const width = svgRef.current.clientWidth || 400;
+    const height = 320;
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const my = (e.clientY - rect.top) * (canvas.height / rect.height);
-    const scaleX = canvas.width / 500;
-    const scaleY = canvas.height / 360;
+    d3.select(svgRef.current).selectAll('*').remove();
 
-    let found: typeof connectomeNodes[0] | null = null;
-    for (const node of connectomeNodes) {
-      const dx = node.x * scaleX - mx;
-      const dy = node.y * scaleY - my;
-      if (Math.sqrt(dx * dx + dy * dy) < 16) { found = node; break; }
-    }
-    setHoveredNode(found?.id || null);
-    setTooltip(found ? { x: e.clientX - rect.left, y: e.clientY - rect.top, label: found.label, activity: found.activity } : null);
-  };
+    const svg = d3.select(svgRef.current)
+      .attr('width', width)
+      .attr('height', height);
+
+    const colorScale = d3.scaleSequential(d3.interpolateRdYlGn)
+      .domain([1, 0]);
+
+    const simulation = d3.forceSimulation(nodes as d3.SimulationNodeDatum[])
+      .force('link', d3.forceLink(edges)
+        .id((d: any) => d.id)
+        .strength((d: any) => d.weight * 0.3))
+      .force('charge', d3.forceManyBody().strength(-80))
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('collision', d3.forceCollide(18));
+
+    const link = svg.append('g')
+      .selectAll('line')
+      .data(edges)
+      .join('line')
+      .attr('stroke', 'rgba(129,140,248,0.25)')
+      .attr('stroke-width', (d: any) => d.weight * 2);
+
+    const node = svg.append('g')
+      .selectAll('g')
+      .data(nodes)
+      .join('g')
+      .attr('cursor', 'pointer')
+      .call(d3.drag<any, any>()
+        .on('start', (event, d) => {
+          if (!event.active) simulation.alphaTarget(0.3).restart();
+          d.fx = d.x;
+          d.fy = d.y;
+        })
+        .on('drag', (event, d) => {
+          d.fx = event.x;
+          d.fy = event.y;
+        })
+        .on('end', (event, d) => {
+          if (!event.active) simulation.alphaTarget(0);
+          d.fx = null;
+          d.fy = null;
+        }));
+
+    node.append('circle')
+      .attr('r', (d: any) => 8 + d.activity * 6)
+      .attr('fill', (d: any) => colorScale(d.activity))
+      .attr('stroke', 'rgba(255,255,255,0.2)')
+      .attr('stroke-width', 1);
+
+    node.append('text')
+      .text((d: any) => d.label)
+      .attr('text-anchor', 'middle')
+      .attr('dy', '0.35em')
+      .attr('fill', '#e4e4e7')
+      .attr('font-size', '9px')
+      .attr('pointer-events', 'none');
+
+    node.append('title').text((d: any) => `${d.label}\nRegion: ${d.region}\nActivity: ${d.activity.toFixed(2)}`);
+
+    simulation.on('tick', () => {
+      link
+        .attr('x1', (d: any) => d.source.x)
+        .attr('y1', (d: any) => d.source.y)
+        .attr('x2', (d: any) => d.target.x)
+        .attr('y2', (d: any) => d.target.y);
+      node.attr('transform', (d: any) => `translate(${d.x},${d.y})`);
+    });
+
+    return () => simulation.stop();
+  }, []);
 
   return (
-    <div className="bg-card rounded-lg border border-border p-4 relative">
+    <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h3 style={{ fontSize: '13px' }} className="text-foreground">Brain Connectome</h3>
-          <UncertaintyBadge confidence={0.82} />
-        </div>
-        <span className="text-muted-foreground font-mono" style={{ fontSize: '10px' }}>fMRI resting-state · 04/07</span>
+        <h3 className="text-sm font-medium text-foreground">Brain Connectome</h3>
+        <span className="text-xs text-muted-foreground">D3 Force Graph · Drag nodes</span>
       </div>
-      <canvas
-        ref={canvasRef}
-        width={500}
-        height={340}
-        className="w-full rounded cursor-crosshair"
-        style={{ height: '220px', background: 'rgba(0,0,0,0.2)' }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => { setHoveredNode(null); setTooltip(null); }}
-      />
-      {tooltip && (
-        <div className="absolute bg-popover border border-border rounded px-2 py-1 pointer-events-none z-10"
-          style={{ left: tooltip.x + 10, top: tooltip.y - 10, fontSize: '11px' }}>
-          <div className="text-foreground">{tooltip.label}</div>
-          <div className="text-muted-foreground font-mono" style={{ fontSize: '10px' }}>
-            Activity: {(tooltip.activity * 100).toFixed(0)}%
-          </div>
-        </div>
-      )}
-      {/* Legend */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-        {Object.entries(regionColors).map(([region, color]) => (
-          <div key={region} className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-            <span className="text-muted-foreground capitalize" style={{ fontSize: '9px' }}>{region}</span>
-          </div>
-        ))}
+      <svg ref={svgRef} className="w-full" style={{ height: 320 }} />
+      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+        <span style={{ color: 'var(--risk-low)' }}>● Low activity</span>
+        <span style={{ color: 'var(--risk-high)' }}>● High activity</span>
+        <span>Edge opacity = connectivity strength</span>
       </div>
     </div>
   );

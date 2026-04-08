@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from fastapi import APIRouter, Depends, Request
 
 from backend.core.rate_limit import limiter, role_limit

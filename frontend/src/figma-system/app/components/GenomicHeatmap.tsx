@@ -1,67 +1,65 @@
-import { useState } from 'react';
+import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { genomicRisks } from '../data/mock-data';
-import { UncertaintyBadge } from './UncertaintyBadge';
 
 export function GenomicHeatmap() {
-  const [hoveredGene, setHoveredGene] = useState<string | null>(null);
+  const data = genomicRisks.map((g, i) => ({
+    x: i % 8,
+    y: Math.floor(i / 8),
+    z: g.risk * 200 + 50,
+    gene: g.gene,
+    variant: g.variant,
+    risk: g.risk,
+    confidence: g.confidence,
+    pathway: g.pathway,
+  }));
 
-  const getRiskColor = (risk: number) => {
-    if (risk >= 0.8) return 'var(--risk-critical)';
-    if (risk >= 0.6) return 'var(--risk-high)';
-    if (risk >= 0.4) return 'var(--risk-moderate)';
+  const riskColor = (risk: number) => {
+    if (risk > 0.75) return 'var(--risk-critical)';
+    if (risk > 0.5) return 'var(--risk-high)';
+    if (risk > 0.25) return 'var(--risk-moderate)';
     return 'var(--risk-low)';
   };
 
-  const getRiskOpacity = (risk: number) => 0.3 + risk * 0.7;
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.[0]) return null;
+    const d = payload[0].payload;
+    return (
+      <div className="rounded-lg border border-border bg-card p-3 text-xs shadow-lg">
+        <p className="font-medium text-foreground">{d.gene} · {d.variant}</p>
+        <p className="text-muted-foreground">{d.pathway}</p>
+        <p style={{ color: riskColor(d.risk) }}>Risk: {(d.risk * 100).toFixed(0)}%</p>
+        <p className="text-muted-foreground">Confidence: {(d.confidence * 100).toFixed(0)}%</p>
+      </div>
+    );
+  };
 
   return (
-    <div className="bg-card rounded-lg border border-border p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <h3 style={{ fontSize: '13px' }} className="text-foreground">Genomic Risk Matrix</h3>
-          <UncertaintyBadge confidence={0.79} />
-        </div>
-        <span className="text-muted-foreground font-mono" style={{ fontSize: '10px' }}>12 variants · Panel v2.4</span>
+        <h3 className="text-sm font-medium text-foreground">Genomic Risk Map</h3>
+        <span className="text-xs text-muted-foreground">{genomicRisks.length} variants · bubble size = risk magnitude</span>
       </div>
-
-      {/* Heatmap grid */}
-      <div className="grid grid-cols-4 gap-1">
-        {genomicRisks.map(g => (
-          <div
-            key={g.gene}
-            className={`relative rounded p-2 cursor-pointer transition-all ${hoveredGene === g.gene ? 'ring-1 ring-primary' : ''}`}
-            style={{
-              backgroundColor: getRiskColor(g.risk),
-              opacity: getRiskOpacity(g.risk),
-            }}
-            onMouseEnter={() => setHoveredGene(g.gene)}
-            onMouseLeave={() => setHoveredGene(null)}
-          >
-            <div className="font-mono text-white" style={{ fontSize: '11px' }}>{g.gene}</div>
-            <div className="font-mono text-white/70" style={{ fontSize: '9px' }}>{(g.risk * 100).toFixed(0)}%</div>
-          </div>
+      <ResponsiveContainer width="100%" height={220}>
+        <ScatterChart margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+          <XAxis type="number" dataKey="x" hide />
+          <YAxis type="number" dataKey="y" hide />
+          <ZAxis type="number" dataKey="z" range={[40, 300]} />
+          <Tooltip content={<CustomTooltip />} cursor={false} />
+          <Scatter data={data}>
+            {data.map((d, i) => (
+              <Cell key={i} fill={riskColor(d.risk)} fillOpacity={0.7} />
+            ))}
+          </Scatter>
+        </ScatterChart>
+      </ResponsiveContainer>
+      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+        {(['critical', 'high', 'moderate', 'low'] as const).map((l) => (
+          <span key={l} className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full" style={{ background: `var(--risk-${l})` }} />
+            {l}
+          </span>
         ))}
       </div>
-
-      {/* Detail panel */}
-      {hoveredGene && (() => {
-        const g = genomicRisks.find(x => x.gene === hoveredGene)!;
-        return (
-          <div className="mt-3 p-2 rounded bg-secondary border border-border" style={{ fontSize: '11px' }}>
-            <div className="flex items-center justify-between">
-              <span className="text-foreground font-mono">{g.gene} · {g.variant}</span>
-              <UncertaintyBadge confidence={g.confidence} />
-            </div>
-            <div className="text-muted-foreground mt-1">{g.pathway}</div>
-            <div className="flex items-center gap-2 mt-1">
-              <div className="h-1 flex-1 rounded-full bg-background overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${g.risk * 100}%`, backgroundColor: getRiskColor(g.risk) }} />
-              </div>
-              <span className="font-mono text-foreground" style={{ fontSize: '10px' }}>{(g.risk * 100).toFixed(0)}%</span>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }

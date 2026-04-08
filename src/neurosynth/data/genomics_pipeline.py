@@ -83,9 +83,8 @@ class GenomicsIngestionPipeline:
                 if value is None:
                     continue
                 arr = np.asarray(value)
-                if np.issubdtype(arr.dtype, np.str_):
-                    h5f.create_dataset(key, data=arr.astype(str), dtype=h5py.string_dtype(encoding="utf-8"))
-                elif arr.dtype == object:
-                    h5f.create_dataset(key, data=arr.astype(str), dtype=h5py.string_dtype(encoding="utf-8"))
+                if arr.dtype.kind in {"U", "S", "O"}:
+                    str_arr = np.vectorize(lambda x: "" if x is None else str(x), otypes=[object])(arr)
+                    h5f.create_dataset(key, data=str_arr, dtype=h5py.string_dtype(encoding="utf-8"))
                 else:
                     h5f.create_dataset(key, data=arr)

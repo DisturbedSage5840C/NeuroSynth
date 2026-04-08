@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from backend.core.config import get_settings

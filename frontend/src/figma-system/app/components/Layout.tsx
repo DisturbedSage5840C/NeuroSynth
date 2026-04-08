@@ -38,7 +38,7 @@ export function Layout() {
       </div>
 
       {/* Patient sidebar */}
-      <PatientSidebar patients={patients} selectedId={selectedPatientId} onSelect={setSelectedPatientId} />
+      <PatientSidebar selectedId={selectedPatientId} onSelect={setSelectedPatientId} />
 
       {/* Main content */}
       <Outlet context={{ selectedPatientId }} />

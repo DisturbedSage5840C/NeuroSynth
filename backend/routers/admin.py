@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 from redis.asyncio import Redis

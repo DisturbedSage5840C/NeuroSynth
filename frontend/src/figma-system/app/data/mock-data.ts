@@ -143,18 +143,18 @@ export function generateBiomarkerData(): BiomarkerReading[] {
 }
 
 export const genomicRisks: GenomicRisk[] = [
-  { gene: 'APOE', variant: 'ε4/ε4', risk: 0.92, confidence: 0.88, pathway: 'Amyloid-β clearance' },
-  { gene: 'TREM2', variant: 'R47H', risk: 0.78, confidence: 0.82, pathway: 'Microglial activation' },
-  { gene: 'PSEN1', variant: 'A246E', risk: 0.85, confidence: 0.91, pathway: 'γ-Secretase processing' },
-  { gene: 'CLU', variant: 'rs11136000', risk: 0.45, confidence: 0.76, pathway: 'Complement activation' },
-  { gene: 'BIN1', variant: 'rs6733839', risk: 0.62, confidence: 0.79, pathway: 'Synaptic vesicle endocytosis' },
-  { gene: 'CD33', variant: 'rs3865444', risk: 0.38, confidence: 0.71, pathway: 'Immune modulation' },
-  { gene: 'SORL1', variant: 'rs2070045', risk: 0.71, confidence: 0.84, pathway: 'APP trafficking' },
-  { gene: 'ABCA7', variant: 'rs4147929', risk: 0.55, confidence: 0.73, pathway: 'Lipid metabolism' },
-  { gene: 'CR1', variant: 'rs6656401', risk: 0.48, confidence: 0.69, pathway: 'Complement regulation' },
-  { gene: 'PICALM', variant: 'rs3851179', risk: 0.33, confidence: 0.77, pathway: 'Clathrin-mediated endocytosis' },
-  { gene: 'MS4A6A', variant: 'rs610932', risk: 0.29, confidence: 0.65, pathway: 'Signal transduction' },
-  { gene: 'EPHA1', variant: 'rs11771145', risk: 0.41, confidence: 0.68, pathway: 'Axon guidance' },
+  { gene: 'APOE4', variant: 'rs429358', risk: 0.91, confidence: 0.95, pathway: 'Lipid metabolism' },
+  { gene: 'CLU', variant: 'rs11136000', risk: 0.68, confidence: 0.82, pathway: 'Complement cascade' },
+  { gene: 'CR1', variant: 'rs6656401', risk: 0.61, confidence: 0.79, pathway: 'Immune regulation' },
+  { gene: 'BIN1', variant: 'rs744373', risk: 0.72, confidence: 0.88, pathway: 'Endocytosis' },
+  { gene: 'PICALM', variant: 'rs3851179', risk: 0.55, confidence: 0.76, pathway: 'Clathrin assembly' },
+  { gene: 'MS4A6A', variant: 'rs610932', risk: 0.48, confidence: 0.71, pathway: 'Membrane transport' },
+  { gene: 'ABCA7', variant: 'rs3764650', risk: 0.63, confidence: 0.84, pathway: 'Lipid homeostasis' },
+  { gene: 'EPHA1', variant: 'rs11767557', risk: 0.39, confidence: 0.68, pathway: 'Axon guidance' },
+  { gene: 'CD33', variant: 'rs3865444', risk: 0.51, confidence: 0.73, pathway: 'Sialic acid binding' },
+  { gene: 'TOMM40', variant: 'rs10524523', risk: 0.77, confidence: 0.89, pathway: 'Mitochondrial import' },
+  { gene: 'SORL1', variant: 'rs2282649', risk: 0.44, confidence: 0.69, pathway: 'APP trafficking' },
+  { gene: 'PTK2B', variant: 'rs28834970', risk: 0.58, confidence: 0.80, pathway: 'Calcium signaling' },
 ];
 
 export const connectomeNodes: ConnectomeNode[] = [
@@ -261,3 +261,53 @@ export const timelineEvents: TimelineEvent[] = [
   { id: 'e11', timestamp: '2026-03-30 16:00', modality: 'imaging', title: 'MRI Brain w/ Contrast', description: 'Surveillance MRI, slight progression noted', value: '+2mm', flag: 'abnormal' },
   { id: 'e12', timestamp: '2026-03-28 10:00', modality: 'wearable', title: 'Gait Analysis', description: 'IMU-based gait assessment', value: 'Stride var: +18%', flag: 'abnormal' },
 ];
+
+export const forecastData: ForecastPoint[] = [
+  { time: 'Apr', predicted: 0.41, upper: 0.52, lower: 0.30, actual: 0.39 },
+  { time: 'May', predicted: 0.44, upper: 0.56, lower: 0.32, actual: 0.46 },
+  { time: 'Jun', predicted: 0.48, upper: 0.61, lower: 0.35, actual: 0.49 },
+  { time: 'Jul', predicted: 0.53, upper: 0.67, lower: 0.39, actual: 0.55 },
+  { time: 'Aug', predicted: 0.58, upper: 0.73, lower: 0.43 },
+  { time: 'Sep', predicted: 0.63, upper: 0.79, lower: 0.47 },
+  { time: 'Oct', predicted: 0.69, upper: 0.85, lower: 0.53 },
+  { time: 'Nov', predicted: 0.74, upper: 0.90, lower: 0.58 },
+  { time: 'Dec', predicted: 0.78, upper: 0.93, lower: 0.63 },
+  { time: 'Jan', predicted: 0.81, upper: 0.95, lower: 0.67 },
+  { time: 'Feb', predicted: 0.83, upper: 0.96, lower: 0.70 },
+  { time: 'Mar', predicted: 0.86, upper: 0.97, lower: 0.75 },
+];
+
+export const biomarkerHistory: BiomarkerReading[] = Array.from({ length: 30 }, (_, i) => ({
+  time: new Date(Date.now() - (30 - i) * 2000).toLocaleTimeString(),
+  heartRate: 72 + Math.sin(i * 0.4) * 8 + Math.random() * 3,
+  spo2: 97.5 - Math.abs(Math.sin(i * 0.3)) * 1.5,
+  systolicBP: 128 + Math.sin(i * 0.2) * 6,
+  diastolicBP: 82 + Math.sin(i * 0.15) * 4,
+  temperature: 37.1 + Math.sin(i * 0.1) * 0.2,
+  respiratoryRate: 16 + Math.sin(i * 0.35) * 2,
+}));
+
+export const connectomeData = {
+  nodes: [
+    { id: 'PFC', label: 'PFC', region: 'Frontal', activity: 0.82, x: 0, y: 0 },
+    { id: 'HC', label: 'Hippocampus', region: 'Temporal', activity: 0.91, x: 0, y: 0 },
+    { id: 'AMY', label: 'Amygdala', region: 'Temporal', activity: 0.78, x: 0, y: 0 },
+    { id: 'THAL', label: 'Thalamus', region: 'Subcortical', activity: 0.55, x: 0, y: 0 },
+    { id: 'CEREB', label: 'Cerebellum', region: 'Posterior', activity: 0.33, x: 0, y: 0 },
+    { id: 'BG', label: 'Basal Ganglia', region: 'Subcortical', activity: 0.62, x: 0, y: 0 },
+    { id: 'ACC', label: 'ACC', region: 'Cingulate', activity: 0.74, x: 0, y: 0 },
+    { id: 'INS', label: 'Insula', region: 'Lateral', activity: 0.69, x: 0, y: 0 },
+  ] as ConnectomeNode[],
+  edges: [
+    { source: 'PFC', target: 'HC', weight: 0.85 },
+    { source: 'HC', target: 'AMY', weight: 0.72 },
+    { source: 'PFC', target: 'ACC', weight: 0.91 },
+    { source: 'THAL', target: 'PFC', weight: 0.67 },
+    { source: 'THAL', target: 'BG', weight: 0.58 },
+    { source: 'AMY', target: 'INS', weight: 0.63 },
+    { source: 'ACC', target: 'INS', weight: 0.77 },
+    { source: 'BG', target: 'CEREB', weight: 0.44 },
+    { source: 'HC', target: 'THAL', weight: 0.69 },
+    { source: 'PFC', target: 'BG', weight: 0.55 },
+  ] as ConnectomeEdge[],
+};

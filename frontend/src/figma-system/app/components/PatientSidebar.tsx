@@ -1,22 +1,27 @@
 import { useState } from 'react';
 import { Search, ChevronDown, ChevronUp, Activity, Brain, User } from 'lucide-react';
-import { Patient } from '../data/mock-data';
+import { patients as mockPatients, type Patient } from '../data/mock-data';
+import { usePatients } from '../hooks/usePatients';
 import { RiskBadge } from './UncertaintyBadge';
 
 interface PatientSidebarProps {
-  patients: Patient[];
   selectedId: string;
   onSelect: (id: string) => void;
 }
 
 type SortKey = 'deteriorationProb' | 'name' | 'lastUpdated';
 
-export function PatientSidebar({ patients, selectedId, onSelect }: PatientSidebarProps) {
+export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
+  const { data: patients = [], isLoading } = usePatients();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('deteriorationProb');
   const [sortAsc, setSortAsc] = useState(false);
 
-  const filtered = patients
+  if (isLoading) return <SidebarSkeleton />;
+
+  const displayPatients: Patient[] = patients.length ? patients : mockPatients;
+
+  const filtered = displayPatients
     .filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.mrn.includes(search))
     .sort((a, b) => {
       const mul = sortAsc ? 1 : -1;
@@ -109,6 +114,20 @@ export function PatientSidebar({ patients, selectedId, onSelect }: PatientSideba
           <span>{filtered.length} patients</span>
           <span className="font-mono">v3.2.1</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SidebarSkeleton() {
+  return (
+    <div className="w-72 h-full flex flex-col border-r border-border bg-[var(--sidebar)] p-4 gap-3">
+      <div className="h-4 w-28 rounded bg-secondary animate-pulse" />
+      <div className="h-8 w-full rounded bg-secondary animate-pulse" />
+      <div className="space-y-2 mt-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-14 w-full rounded bg-secondary animate-pulse" />
+        ))}
       </div>
     </div>
   );

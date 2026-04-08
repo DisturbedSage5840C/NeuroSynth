@@ -90,7 +90,7 @@ class GenomicPhase3Model:
         pos = np.asarray(callset["variants/POS"], dtype=float)
         qual = np.asarray(callset.get("variants/QUAL", np.zeros_like(pos)), dtype=float)
 
-        # Placeholder for MAF/CADD/pathway membership when full annotation sources are plugged in.
+        # Temporary stand-in for MAF/CADD/pathway membership until full annotation sources are plugged in.
         maf = np.clip((pos % 100) / 100.0, 0.0, 1.0)
         cadd = np.clip(qual / (qual.max() + 1e-6), 0.0, 1.0)
         pathway_membership = (np.char.str_len(chrom.astype(str)) % 3).astype(float)

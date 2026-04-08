@@ -29,7 +29,11 @@ def _key_func(request: Request) -> str:
 limiter = Limiter(key_func=_key_func, default_limits=[])
 
 
-def role_limit(request: Request) -> str:
+def role_limit(request: Request | None = None) -> str:
+    # SlowAPI invokes limit provider callables without arguments.
+    if request is None:
+        return ROLE_LIMITS.get(Role.CLINICIAN.value, "30/minute")
+
     user = getattr(request.state, "user", None)
     if user is None:
         return "30/minute"

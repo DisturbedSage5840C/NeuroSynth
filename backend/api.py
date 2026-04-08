@@ -160,6 +160,6 @@ async def metrics_root(_: object = Depends(require_role(Role.ADMIN))) -> Respons
     return Response(content=payload, media_type=content_type)
 
 
-static_dir = Path("frontend/dist")
+static_dir = Path("static")
 if static_dir.exists():
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
