@@ -12,7 +12,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   headers.set("Content-Type", headers.get("Content-Type") || "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, credentials: "include" });
 
   if (response.status === 401 && authStore.getState().refreshToken) {
     const refreshed = await refreshToken();
@@ -34,25 +34,27 @@ export async function login(email: string, password: string): Promise<{ access_t
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    credentials: "include",
+    body: JSON.stringify({ username: email, password, role: "CLINICIAN" }),
   });
   if (!response.ok) throw new Error("Login failed");
-  return response.json();
+  const payload = await response.json();
+  const role = String(payload?.user?.role ?? "CLINICIAN").toLowerCase();
+  // Backend auth is cookie-based; keep lightweight client tokens for route guards.
+  return { access_token: "cookie-session", refresh_token: "cookie-session", role };
 }
 
 export async function refreshToken(): Promise<boolean> {
-  const refresh = authStore.getState().refreshToken;
-  if (!refresh) return false;
-
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refresh }),
+    credentials: "include",
   });
 
   if (!response.ok) return false;
   const payload = await response.json();
-  authStore.getState().setTokens(payload.access_token, payload.refresh_token ?? refresh, payload.role);
+  const role = String(payload?.user?.role ?? authStore.getState().role ?? "CLINICIAN").toLowerCase();
+  authStore.getState().setTokens("cookie-session", "cookie-session", role);
   return true;
 }
 
