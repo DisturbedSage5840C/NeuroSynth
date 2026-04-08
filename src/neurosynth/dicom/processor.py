@@ -31,6 +31,7 @@ SAFE_HARBOR_TAGS = [
 
 def _validate_single(path: str) -> DicomValidationResult:
     ds = pydicom.dcmread(path, stop_before_pixels=False, force=True)
+    has_private_tags = any(getattr(elem.tag, "is_private", False) for elem in ds.iterall())
     return DicomValidationResult(
         is_valid=True,
         modality=getattr(ds, "Modality", None),
@@ -40,7 +41,7 @@ def _validate_single(path: str) -> DicomValidationResult:
         pixel_spacing=[float(x) for x in getattr(ds, "PixelSpacing", [])],
         slice_thickness=float(getattr(ds, "SliceThickness", 0) or 0) or None,
         n_slices=int(getattr(ds, "ImagesInAcquisition", 0) or 0) or None,
-        has_private_tags=bool(ds.private_block(0x0009, "", create=False) is not None),
+        has_private_tags=has_private_tags,
     )
 
 

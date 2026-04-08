@@ -30,6 +30,7 @@ async def biomarkers_info(request: Request, user: UserContext = Depends(get_curr
 
 @router.get(
     "/stream",
+    response_class=StreamingResponse,
     summary="Biomarker live stream",
     description="Server-Sent Events stream for real-time phase progress emitted from Redis pub/sub.",
 )
@@ -38,7 +39,7 @@ async def biomarkers_stream(
     request: Request,
     user: UserContext = Depends(get_current_user),
     redis_client: Redis = Depends(get_redis),
-) -> StreamingResponse:
+):
     _ = request
     _ = user
 

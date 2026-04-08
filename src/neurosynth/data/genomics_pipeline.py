@@ -82,4 +82,10 @@ class GenomicsIngestionPipeline:
             for key, value in callset.items():
                 if value is None:
                     continue
-                h5f.create_dataset(key, data=value)
+                arr = np.asarray(value)
+                if np.issubdtype(arr.dtype, np.str_):
+                    h5f.create_dataset(key, data=arr.astype(str), dtype=h5py.string_dtype(encoding="utf-8"))
+                elif arr.dtype == object:
+                    h5f.create_dataset(key, data=arr.astype(str), dtype=h5py.string_dtype(encoding="utf-8"))
+                else:
+                    h5f.create_dataset(key, data=arr)
