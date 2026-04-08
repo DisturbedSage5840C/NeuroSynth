@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
@@ -162,4 +163,17 @@ async def metrics_root(_: object = Depends(require_role(Role.ADMIN))) -> Respons
 
 static_dir = Path("static")
 if static_dir.exists():
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
+    assets_dir = static_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+    @app.get("/", include_in_schema=False)
+    async def frontend_index() -> FileResponse:
+        return FileResponse(static_dir / "index.html")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def frontend_spa_fallback(full_path: str) -> FileResponse:
+        candidate = static_dir / full_path
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(static_dir / "index.html")
