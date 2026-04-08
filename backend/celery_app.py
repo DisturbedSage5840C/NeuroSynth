@@ -10,6 +10,7 @@ celery_app = Celery(
     "neurosynth",
     broker=settings.redis_url,
     backend=settings.redis_url,
+    include=["backend.tasks"],
 )
 
 celery_app.conf.update(
