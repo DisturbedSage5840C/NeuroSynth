@@ -3,6 +3,7 @@ from neurosynth.causal.data_prep import CausalDataPreparer
 from neurosynth.causal.model import NeuralCausalDiscovery
 from neurosynth.causal.patient import PatientCausalAnalyzer
 from neurosynth.causal.trainer import NotearsTrainer
+from neurosynth.causal.phase5_engine import CausalPhase5Engine, Phase5Config
 from neurosynth.causal.types import (
     CausalInput,
     InterventionResult,
@@ -24,4 +25,6 @@ __all__ = [
     "PatientCausalGraph",
     "InterventionResult",
     "ValidationReport",
+    "CausalPhase5Engine",
+    "Phase5Config",
 ]

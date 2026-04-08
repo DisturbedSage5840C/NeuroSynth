@@ -1,0 +1,115 @@
+import { useState } from 'react';
+import { Search, ChevronDown, ChevronUp, Activity, Brain, User } from 'lucide-react';
+import { Patient } from '../data/mock-data';
+import { RiskBadge } from './UncertaintyBadge';
+
+interface PatientSidebarProps {
+  patients: Patient[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}
+
+type SortKey = 'deteriorationProb' | 'name' | 'lastUpdated';
+
+export function PatientSidebar({ patients, selectedId, onSelect }: PatientSidebarProps) {
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('deteriorationProb');
+  const [sortAsc, setSortAsc] = useState(false);
+
+  const filtered = patients
+    .filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.mrn.includes(search))
+    .sort((a, b) => {
+      const mul = sortAsc ? 1 : -1;
+      if (sortKey === 'name') return mul * a.name.localeCompare(b.name);
+      if (sortKey === 'deteriorationProb') return mul * (a.deteriorationProb - b.deteriorationProb);
+      return 0;
+    });
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else { setSortKey(key); setSortAsc(false); }
+  };
+
+  return (
+    <div className="w-72 h-full flex flex-col border-r border-border bg-[var(--sidebar)]">
+      {/* Header */}
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center gap-2 mb-3">
+          <Brain size={18} className="text-primary" />
+          <span className="font-mono tracking-wider" style={{ fontSize: '11px', color: 'var(--muted-foreground)' }}>NEUROSYNTH</span>
+        </div>
+        <div className="relative">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search patients or MRN..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-8 pr-3 py-1.5 rounded-md bg-[var(--input-background)] border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+            style={{ fontSize: '12px' }}
+          />
+        </div>
+      </div>
+
+      {/* Sort controls */}
+      <div className="px-4 py-2 flex items-center gap-2 border-b border-border">
+        <span className="text-muted-foreground" style={{ fontSize: '10px', letterSpacing: '0.05em' }}>SORT BY</span>
+        <button
+          onClick={() => handleSort('deteriorationProb')}
+          className={`px-2 py-0.5 rounded text-[10px] transition-colors ${sortKey === 'deteriorationProb' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          RISK {sortKey === 'deteriorationProb' && (sortAsc ? <ChevronUp size={10} className="inline" /> : <ChevronDown size={10} className="inline" />)}
+        </button>
+        <button
+          onClick={() => handleSort('name')}
+          className={`px-2 py-0.5 rounded text-[10px] transition-colors ${sortKey === 'name' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          NAME {sortKey === 'name' && (sortAsc ? <ChevronUp size={10} className="inline" /> : <ChevronDown size={10} className="inline" />)}
+        </button>
+      </div>
+
+      {/* Patient list */}
+      <div className="flex-1 overflow-y-auto">
+        {filtered.map(patient => (
+          <button
+            key={patient.id}
+            onClick={() => onSelect(patient.id)}
+            className={`w-full text-left px-4 py-3 border-b border-border transition-colors ${
+              selectedId === patient.id
+                ? 'bg-primary/8 border-l-2 border-l-primary'
+                : 'hover:bg-[var(--sidebar-accent)] border-l-2 border-l-transparent'
+            }`}
+          >
+            <div className="flex items-start justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center">
+                  <User size={12} className="text-muted-foreground" />
+                </div>
+                <div>
+                  <div className="text-foreground" style={{ fontSize: '12px' }}>{patient.name}</div>
+                  <div className="text-muted-foreground font-mono" style={{ fontSize: '10px' }}>{patient.mrn} · {patient.age}{patient.sex}</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between mt-1.5 pl-8">
+              <RiskBadge level={patient.riskLevel} value={`${Math.round(patient.deteriorationProb * 100)}%`} />
+              <span className="text-muted-foreground" style={{ fontSize: '10px' }}>
+                <Activity size={10} className="inline mr-1" />
+                {patient.lastUpdated}
+              </span>
+            </div>
+            <div className="text-muted-foreground mt-1 pl-8" style={{ fontSize: '10px' }}>{patient.diagnosis}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="p-3 border-t border-border">
+        <div className="flex items-center justify-between text-muted-foreground" style={{ fontSize: '10px' }}>
+          <span>{filtered.length} patients</span>
+          <span className="font-mono">v3.2.1</span>
+        </div>
+      </div>
+    </div>
+  );
+}

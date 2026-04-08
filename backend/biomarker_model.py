@@ -125,7 +125,14 @@ class BiomarkerPredictor:
             if len(shap_values) == 2:
                 return np.asarray(shap_values[1])
             return np.asarray(shap_values[0])
-        return np.asarray(shap_values)
+
+        arr = np.asarray(shap_values)
+        # Some SHAP versions return (n_samples, n_features, n_classes) for tree models.
+        if arr.ndim == 3:
+            if arr.shape[-1] == 2:
+                return arr[:, :, 1]
+            return arr.mean(axis=-1)
+        return arr
 
     def predict(self, X: np.ndarray) -> dict[str, Any]:
         ensemble, per_model = self._ensemble_probs(X)

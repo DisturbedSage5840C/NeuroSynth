@@ -1,262 +1,163 @@
 from __future__ import annotations
 
+import time
+import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from uuid import uuid4
 
-import numpy as np
-import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from redis.asyncio import Redis
+from slowapi.errors import RateLimitExceeded
 
-from backend.biomarker_model import BiomarkerPredictor
-from backend.causal_engine import NeuralCausalDiscovery
-from backend.data_pipeline import DataPipeline
-from backend.report_generator import ClinicalReportGenerator
-from backend.temporal_model import TemporalProgressionModel
-
-
-class PatientRequest(BaseModel):
-    Age: float
-    Gender: float
-    Ethnicity: float
-    EducationLevel: float
-    BMI: float
-    Smoking: float
-    AlcoholConsumption: float
-    PhysicalActivity: float
-    DietQuality: float
-    SleepQuality: float
-    FamilyHistoryAlzheimers: float
-    CardiovascularDisease: float
-    Diabetes: float
-    Depression: float
-    HeadInjury: float
-    Hypertension: float
-    SystolicBP: float
-    DiastolicBP: float
-    CholesterolTotal: float
-    CholesterolLDL: float
-    CholesterolHDL: float
-    CholesterolTriglycerides: float
-    MMSE: float
-    FunctionalAssessment: float
-    MemoryComplaints: float
-    BehavioralProblems: float
-    ADL: float
-    Confusion: float
-    Disorientation: float
-    PersonalityChanges: float
-    DifficultyCompletingTasks: float
-    Forgetfulness: float
+from backend.celery_app import celery_app
+from backend.core.config import get_settings
+from backend.core.logging import configure_structlog, get_logger
+from backend.core.metrics import CELERY_QUEUE_DEPTH, REQUEST_COUNT, REQUEST_LATENCY, render_metrics
+from backend.core.rate_limit import limiter, rate_limit_exceeded_handler
+from backend.core.security import ACCESS_COOKIE, Role, decode_token, hash_patient_id
+from backend.db import get_db
+from backend.deps import require_role
+from backend.routers import admin, auth, biomarkers, causal, health, patients, pipelines, predictions, reports
 
 
-class SimulationRequest(BaseModel):
-    patient_data: dict[str, float]
-    variable: str
-    new_value: float = Field(ge=0.0, le=1.0)
+async def _drain_celery_queue(timeout_seconds: int = 20) -> None:
+    started = time.monotonic()
+    while time.monotonic() - started < timeout_seconds:
+        try:
+            inspect = celery_app.control.inspect(timeout=1.0)
+            active = inspect.active() or {}
+            reserved = inspect.reserved() or {}
+        except Exception:
+            # If broker is unavailable during shutdown, exit drain gracefully.
+            return
+        in_progress = sum(len(v) for v in active.values()) + sum(len(v) for v in reserved.values())
+        if in_progress == 0:
+            return
+        await asyncio.sleep(1.0)
 
 
-app = FastAPI(title="NeuroSynth API", version="2.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    configure_structlog()
+    logger = get_logger("neurosynth.bootstrap")
+
+    db = get_db()
+    try:
+        await db.connect()
+        logger.info("database_connected")
+    except Exception as exc:
+        logger.warning("database_connect_failed", error=str(exc))
+
+    try:
+        app.state.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+        await app.state.redis.ping()
+        logger.info("redis_connected")
+    except Exception as exc:
+        app.state.redis = None
+        logger.warning("redis_connect_failed", error=str(exc))
+
+    yield
+
+    await _drain_celery_queue()
+    redis_client = getattr(app.state, "redis", None)
+    if redis_client is not None:
+        await redis_client.close()
+    await db.disconnect()
+
+
+settings = get_settings()
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    description="Production API for NeuroSynth healthcare AI workflows with async orchestration and role-based access.",
+    lifespan=lifespan,
+)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
-STATE: dict[str, Any] = {
-    "ready": False,
-    "pipeline": None,
-    "predictor": None,
-    "temporal": None,
-    "causal": None,
-    "reporter": None,
-    "feature_names": [],
-    "dataset_stats": {},
-    "X_test": None,
-    "y_test": None,
-    "X_test_raw": None,
-    "causal_graph": None,
-}
+
+@app.middleware("http")
+async def auth_context_middleware(request: Request, call_next):
+    token = request.cookies.get(ACCESS_COOKIE)
+    request.state.user = None
+    if token:
+        try:
+            payload = decode_token(token, expected_type="access")
+            request.state.user = {
+                "user_id": str(payload["sub"]),
+                "role": str(payload["role"]),
+            }
+        except Exception:
+            request.state.user = None
+    return await call_next(request)
 
 
-def _to_frame(patient: PatientRequest) -> pd.DataFrame:
-    return pd.DataFrame([patient.model_dump()])
+@app.middleware("http")
+async def telemetry_middleware(request: Request, call_next):
+    logger = get_logger("neurosynth.request")
+    trace_id = str(uuid4())
+    started = time.perf_counter()
 
+    patient_id = request.headers.get("x-patient-id")
+    patient_id_hash = hash_patient_id(patient_id)
+    response = await call_next(request)
+    latency_s = time.perf_counter() - started
+    user = getattr(request.state, "user", None) or {"role": "ANON"}
+    path = request.url.path
+    REQUEST_COUNT.labels(method=request.method, path=path, status=str(response.status_code)).inc()
+    REQUEST_LATENCY.labels(method=request.method, path=path).observe(latency_s)
 
-def _to_causal_patient_map(patient_dict: dict[str, float]) -> dict[str, float]:
-    return {
-        "Age": float(patient_dict.get("Age", 0.0)),
-        "MMSE": float(patient_dict.get("MMSE", 0.0)),
-        "FunctionalAssessment": float(patient_dict.get("FunctionalAssessment", 0.0)),
-        "ADL": float(patient_dict.get("ADL", 0.0)),
-        "MemoryComplaints": float(patient_dict.get("MemoryComplaints", 0.0)),
-        "BehavioralProblems": float(patient_dict.get("BehavioralProblems", 0.0)),
-        "Depression": float(patient_dict.get("Depression", 0.0)),
-        "SleepQuality": float(patient_dict.get("SleepQuality", 0.0)),
-        "PhysicalActivity": float(patient_dict.get("PhysicalActivity", 0.0)),
-    }
-
-
-@app.on_event("startup")
-def startup_pipeline() -> None:
-    print("[NeuroSynth] Startup: loading dataset and training models...")
-    pipeline = DataPipeline()
-    X_train, X_test, y_train, y_test, feature_names, scaler, stats = pipeline.process()
-
-    print("[NeuroSynth] Training ensemble biomarker model...")
-    predictor = BiomarkerPredictor(feature_names=feature_names)
-    predictor.train(X_train.values, y_train.values)
-
-    print("[NeuroSynth] Training pseudo-temporal progression model...")
-    temporal = TemporalProgressionModel(feature_names=feature_names)
-    temporal.train_model(X_train.values, y_train.values)
-
-    print("[NeuroSynth] Fitting neural causal discovery engine...")
-    causal = NeuralCausalDiscovery()
-    causal_vars = causal.variables
-    causal_df = pipeline.df_processed[causal_vars].copy() if pipeline.df_processed is not None else pd.DataFrame()
-    if not causal_df.empty:
-        causal.fit(causal_df.values.astype(float), epochs=1000, outer_iters=15, inner_iters=100)
-
-    reporter = ClinicalReportGenerator()
-
-    STATE.update(
-        {
-            "ready": True,
-            "pipeline": pipeline,
-            "predictor": predictor,
-            "temporal": temporal,
-            "causal": causal,
-            "reporter": reporter,
-            "feature_names": feature_names,
-            "dataset_stats": stats,
-            "X_test": X_test.values,
-            "y_test": y_test.values,
-            "X_test_raw": pipeline.df_processed.loc[X_test.index, feature_names].values if pipeline.df_processed is not None else None,
-            "causal_graph": causal.get_causal_graph(),
-            "scaler": scaler,
-        }
+    logger.info(
+        "request_completed",
+        trace_id=trace_id,
+        role=user.get("role"),
+        patient_id=patient_id_hash,
+        latency_ms=round(latency_s * 1000, 2),
+        method=request.method,
+        path=path,
+        status_code=response.status_code,
     )
-    print("[NeuroSynth] Startup complete.")
+    response.headers["X-Trace-Id"] = trace_id
+    return response
 
 
-@app.get("/health")
-def health() -> dict[str, Any]:
-    return {"status": "running", "ready": bool(STATE["ready"]) }
+app.include_router(health.router)
+app.include_router(auth.router)
+app.include_router(patients.router)
+app.include_router(predictions.router)
+app.include_router(reports.router)
+app.include_router(causal.router)
+app.include_router(biomarkers.router)
+app.include_router(admin.router)
+app.include_router(pipelines.router)
 
 
-@app.get("/dataset/stats")
-def dataset_stats() -> dict[str, Any]:
-    return STATE["dataset_stats"]
-
-
-@app.get("/model/performance")
-def model_performance() -> dict[str, Any]:
-    predictor: BiomarkerPredictor = STATE["predictor"]
-    return predictor.evaluate(STATE["X_test"], STATE["y_test"])
-
-
-@app.get("/model/feature_importance")
-def model_feature_importance() -> dict[str, float]:
-    predictor: BiomarkerPredictor = STATE["predictor"]
-    return predictor.get_feature_importance()
-
-
-@app.get("/model/shap_summary")
-def model_shap_summary() -> dict[str, float]:
-    predictor: BiomarkerPredictor = STATE["predictor"]
-    X = STATE["X_test"]
-    shap_vals = predictor.get_shap_values(X[: min(len(X), 300)])
-    mean_abs = np.mean(np.abs(shap_vals), axis=0)
-    pairs = sorted(zip(STATE["feature_names"], mean_abs.tolist()), key=lambda x: x[1], reverse=True)
-    return {k: round(float(v), 6) for k, v in pairs}
-
-
-@app.get("/causal/graph")
-def causal_graph() -> dict[str, Any]:
-    causal: NeuralCausalDiscovery = STATE["causal"]
-    return causal.get_causal_graph()
-
-
-@app.post("/predict")
-def predict(patient: PatientRequest) -> dict[str, Any]:
-    predictor: BiomarkerPredictor = STATE["predictor"]
-    temporal: TemporalProgressionModel = STATE["temporal"]
-
-    frame = _to_frame(patient)
-    scaler = STATE["scaler"]
-    scaled = scaler.transform(frame[STATE["feature_names"]])
-
-    prediction = predictor.predict(scaled)
-    traj = temporal.predict_trajectory(frame[STATE["feature_names"]].values[0], prediction["probability"])
-
-    shap_vals = predictor.get_shap_values(scaled[:1])[0]
-    top_idx = np.argsort(np.abs(shap_vals))[::-1][:5]
-    shap_top = [
-        {
-            "feature": STATE["feature_names"][i],
-            "value": round(float(shap_vals[i]), 4),
-        }
-        for i in top_idx
-    ]
-
-    return {
-        **prediction,
-        "trajectory": traj["trajectory"],
-        "confidence_bands": traj["confidence_bands"],
-        "shap_values": shap_top,
-    }
-
-
-@app.post("/report")
-def report(patient: PatientRequest) -> dict[str, Any]:
-    predictor: BiomarkerPredictor = STATE["predictor"]
-    temporal: TemporalProgressionModel = STATE["temporal"]
-    causal: NeuralCausalDiscovery = STATE["causal"]
-    reporter: ClinicalReportGenerator = STATE["reporter"]
-
-    frame = _to_frame(patient)
-    scaled = STATE["scaler"].transform(frame[STATE["feature_names"]])
-
-    prediction = predictor.predict(scaled)
-    traj = temporal.predict_trajectory(frame[STATE["feature_names"]].values[0], prediction["probability"])
-
-    shap_vals = predictor.get_shap_values(scaled[:1])[0]
-    top_idx = np.argsort(np.abs(shap_vals))[::-1][:5]
-    shap_top = [{"feature": STATE["feature_names"][i], "value": float(shap_vals[i])} for i in top_idx]
-
-    return reporter.generate_report(
-        patient_data=frame.iloc[0].to_dict(),
-        prediction=prediction,
-        trajectory=traj["trajectory"],
-        causal_graph=causal.get_causal_graph(),
-        shap_values=shap_top,
-    )
-
-
-@app.post("/simulate")
-def simulate(req: SimulationRequest) -> dict[str, Any]:
-    causal: NeuralCausalDiscovery = STATE["causal"]
-    cpatient = _to_causal_patient_map(req.patient_data)
-    return causal.simulate_intervention(req.variable, req.new_value, cpatient)
-
-
-@app.post("/batch_predict")
-def batch_predict(records: list[PatientRequest]) -> dict[str, Any]:
-    if len(records) > 50:
-        raise HTTPException(status_code=400, detail="Maximum 50 records per batch")
-
-    results = []
-    for rec in records:
-        frame = _to_frame(rec)
-        scaled = STATE["scaler"].transform(frame[STATE["feature_names"]])
-        pred = STATE["predictor"].predict(scaled)
-        results.append(pred)
-    return {"count": len(results), "results": results}
+@app.get(
+    "/metrics",
+    summary="Prometheus metrics",
+    description="Admin-only metrics endpoint for scraping by Prometheus.",
+)
+async def metrics_root(_: object = Depends(require_role(Role.ADMIN))) -> Response:
+    redis_client = getattr(app.state, "redis", None)
+    if redis_client is not None:
+        depth = int(await redis_client.llen("celery"))
+        CELERY_QUEUE_DEPTH.labels(queue="celery").set(depth)
+    payload, content_type = render_metrics()
+    return Response(content=payload, media_type=content_type)
 
 
 static_dir = Path("frontend/dist")

@@ -10,6 +10,11 @@ _LAZY_EXPORTS = {
     "NeuroRAGPipeline": ("neurosynth.llm.rag", "NeuroRAGPipeline"),
     "ConstrainedReportGenerator": ("neurosynth.llm.generation", "ConstrainedReportGenerator"),
     "NeuroLLMEvaluator": ("neurosynth.llm.evaluation", "NeuroLLMEvaluator"),
+    "ClinicalCorpusPreparer": ("neurosynth.llm.corpus_prep", "ClinicalCorpusPreparer"),
+    "ClinicalFineTuner": ("neurosynth.llm.fine_tune", "ClinicalFineTuner"),
+    "Phase6RAGPipeline": ("neurosynth.llm.rag_pipeline", "Phase6RAGPipeline"),
+    "Phase6ReportGenerator": ("neurosynth.llm.report_generator", "Phase6ReportGenerator"),
+    "ClinicalReportValidator": ("neurosynth.llm.report_validator", "ClinicalReportValidator"),
 }
 
 
@@ -31,4 +36,9 @@ __all__ = [
     "NeuroRAGPipeline",
     "ConstrainedReportGenerator",
     "NeuroLLMEvaluator",
+    "ClinicalCorpusPreparer",
+    "ClinicalFineTuner",
+    "Phase6RAGPipeline",
+    "Phase6ReportGenerator",
+    "ClinicalReportValidator",
 ]

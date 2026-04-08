@@ -14,6 +14,8 @@ _LAZY_EXPORTS = {
     "NeuroGNNTrainer": ("neurosynth.connectome.trainer", "NeuroGNNTrainer"),
     "ConnectomeExplainer": ("neurosynth.connectome.explain", "ConnectomeExplainer"),
     "ExplanationResult": ("neurosynth.connectome.explain", "ExplanationResult"),
+    "BrainConnectomePhase2Model": ("neurosynth.connectome.phase2_gnn", "BrainConnectomePhase2Model"),
+    "ConnectomeConfig": ("neurosynth.connectome.phase2_gnn", "ConnectomeConfig"),
 }
 
 
@@ -39,4 +41,6 @@ __all__ = [
     "NeuroGNNTrainer",
     "ConnectomeExplainer",
     "ExplanationResult",
+    "BrainConnectomePhase2Model",
+    "ConnectomeConfig",
 ]
