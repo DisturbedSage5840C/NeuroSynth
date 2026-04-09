@@ -6,6 +6,15 @@ from backend.models import ApiMessage, LoginRequest, TokenEnvelope, UserContext
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+DEMO_USERS = {
+    "clinician": {"password": "neurosynth", "role": Role.CLINICIAN},
+    "researcher": {"password": "neurosynth", "role": Role.RESEARCHER},
+    "admin": {"password": "neurosynth", "role": Role.ADMIN},
+    "clinician@neurosynth.local": {"password": "neurosynth", "role": Role.CLINICIAN},
+    "researcher@neurosynth.local": {"password": "neurosynth", "role": Role.RESEARCHER},
+    "admin@neurosynth.local": {"password": "neurosynth", "role": Role.ADMIN},
+}
+
 
 @router.post(
     "/login",
@@ -14,12 +23,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     description="Authenticates a user and issues access/refresh JWT tokens in httpOnly cookies.",
 )
 async def login(payload: LoginRequest, response: Response) -> TokenEnvelope:
-    if not payload.password:
+    user_record = DEMO_USERS.get(payload.username)
+    if not user_record or user_record["password"] != payload.password:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    role = user_record["role"]
 
     settings = get_settings()
-    access = create_access_token(payload.username, payload.role)
-    refresh = create_refresh_token(payload.username, payload.role)
+    access = create_access_token(payload.username, role)
+    refresh = create_refresh_token(payload.username, role)
 
     response.set_cookie(ACCESS_COOKIE, access, httponly=True, secure=settings.auth_cookie_secure, samesite="lax", max_age=settings.access_token_minutes * 60)
     response.set_cookie(REFRESH_COOKIE, refresh, httponly=True, secure=settings.auth_cookie_secure, samesite="lax", max_age=settings.refresh_token_days * 86400)
@@ -27,7 +38,7 @@ async def login(payload: LoginRequest, response: Response) -> TokenEnvelope:
     return TokenEnvelope(
         access_expires_in=settings.access_token_minutes * 60,
         refresh_expires_in=settings.refresh_token_days * 86400,
-        user=UserContext(user_id=payload.username, role=payload.role),
+        user=UserContext(user_id=payload.username, role=role),
     )
 
 

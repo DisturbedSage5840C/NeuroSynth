@@ -5,7 +5,6 @@ from typing import Any
 
 import joblib
 import numpy as np
-import shap
 from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -22,6 +21,11 @@ try:
     from xgboost import XGBClassifier
 except Exception:
     XGBClassifier = None
+
+try:
+    import shap  # type: ignore
+except Exception:
+    shap = None
 
 
 class BiomarkerPredictor:
@@ -66,7 +70,7 @@ class BiomarkerPredictor:
 
         self.lr = LogisticRegression(C=1.0, max_iter=1000, class_weight="balanced", random_state=42)
         self.weights = np.array([0.35, 0.35, 0.20, 0.10], dtype=float)
-        self.tree_explainer: shap.TreeExplainer | None = None
+        self.tree_explainer: Any | None = None
 
     @staticmethod
     def _risk_level(prob: float) -> str:
@@ -93,7 +97,8 @@ class BiomarkerPredictor:
         self.third.fit(X_train, y_train)
         self.lr.fit(X_train, y_train)
 
-        self.tree_explainer = shap.TreeExplainer(self.rf)
+        if shap is not None:
+            self.tree_explainer = shap.TreeExplainer(self.rf)
 
         joblib.dump(self.rf, self.models_dir / "rf_model.pkl")
         joblib.dump(self.gb, self.models_dir / "gb_model.pkl")
@@ -117,6 +122,9 @@ class BiomarkerPredictor:
         return ensemble, per_model
 
     def get_shap_values(self, X: np.ndarray) -> np.ndarray:
+        if shap is None:
+            return np.zeros((X.shape[0], X.shape[1]), dtype=float)
+
         if self.tree_explainer is None:
             self.tree_explainer = shap.TreeExplainer(self.rf)
 

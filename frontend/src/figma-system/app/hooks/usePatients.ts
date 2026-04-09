@@ -29,9 +29,12 @@ function toUiPatient(item: ApiPatientSummary, index: number): Patient {
 }
 
 export function usePatients() {
+  const enabled = typeof window !== 'undefined' && localStorage.getItem('ns_logged_in') === 'true';
+
   return useQuery({
     queryKey: ['patients'],
     queryFn: () => apiFetch<{ items: ApiPatientSummary[] }>('/patients'),
     select: (data) => data.items.map(toUiPatient),
+    enabled,
   });
 }

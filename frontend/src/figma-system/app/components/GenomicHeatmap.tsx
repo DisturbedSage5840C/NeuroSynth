@@ -1,17 +1,33 @@
 import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { genomicRisks } from '../data/mock-data';
+import type { AnalysisResult } from '../types/analysis';
 
-export function GenomicHeatmap() {
-  const data = genomicRisks.map((g, i) => ({
-    x: i % 8,
-    y: Math.floor(i / 8),
-    z: g.risk * 200 + 50,
-    gene: g.gene,
-    variant: g.variant,
-    risk: g.risk,
-    confidence: g.confidence,
-    pathway: g.pathway,
-  }));
+interface GenomicHeatmapProps {
+  analysisResult?: AnalysisResult | null;
+}
+
+export function GenomicHeatmap({ analysisResult }: GenomicHeatmapProps) {
+  const data = analysisResult && analysisResult.shap_values?.length
+    ? analysisResult.shap_values.map((s, i) => ({
+        x: i % 8,
+        y: Math.floor(i / 8),
+        z: Math.abs(s.value) * 500 + 60,
+        gene: s.feature,
+        variant: 'shap',
+        risk: Math.min(1, Math.abs(s.value)),
+        confidence: 0.85,
+        pathway: 'Model attribution',
+      }))
+    : genomicRisks.map((g, i) => ({
+        x: i % 8,
+        y: Math.floor(i / 8),
+        z: g.risk * 200 + 50,
+        gene: g.gene,
+        variant: g.variant,
+        risk: g.risk,
+        confidence: g.confidence,
+        pathway: g.pathway,
+      }));
 
   const riskColor = (risk: number) => {
     if (risk > 0.75) return 'var(--risk-critical)';

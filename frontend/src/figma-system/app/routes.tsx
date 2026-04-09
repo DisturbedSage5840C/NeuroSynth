@@ -9,8 +9,9 @@ import { useOutletContext } from 'react-router';
 import { useAuthStore } from '../../state/authStore';
 
 function RequireAuth({ children }: { children: ReactNode }) {
-  const token = useAuthStore((s) => s.accessToken);
-  if (!token) return <Navigate to="/login" replace />;
+  const role = useAuthStore((s) => s.role);
+  const hasSession = typeof window !== 'undefined' && localStorage.getItem('ns_logged_in') === 'true';
+  if (!role && !hasSession) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 

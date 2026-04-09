@@ -2,7 +2,11 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts';
-import { forecastData } from '../data/mock-data';
+import type { AnalysisResult } from '../types/analysis';
+
+interface ForecastChartProps {
+  analysisResult?: AnalysisResult | null;
+}
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -17,7 +21,16 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export function ForecastChart() {
+export function ForecastChart({ analysisResult }: ForecastChartProps) {
+  const forecastData = analysisResult
+    ? analysisResult.trajectory.map((risk, index) => ({
+        time: `${(index + 1) * 6}m`,
+        predicted: risk,
+        lower: analysisResult.confidence_bands?.lower?.[index] ?? Math.max(0, risk - 0.08),
+        upper: analysisResult.confidence_bands?.upper?.[index] ?? Math.min(1, risk + 0.08),
+      }))
+    : [];
+
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-3">
@@ -37,6 +50,11 @@ export function ForecastChart() {
           </span>
         </div>
       </div>
+      {!analysisResult ? (
+        <div className="flex h-[220px] items-center justify-center text-xs text-muted-foreground">
+          Run an analysis to populate trajectory forecast.
+        </div>
+      ) : (
       <ResponsiveContainer width="100%" height={220}>
         <AreaChart data={forecastData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
           <defs>
@@ -56,6 +74,7 @@ export function ForecastChart() {
           <Area type="monotone" dataKey="actual" stroke="var(--chart-2)" strokeWidth={2} strokeDasharray="4 4" fill="none" dot={{ fill: 'var(--chart-2)', r: 3 }} />
         </AreaChart>
       </ResponsiveContainer>
+      )}
     </div>
   );
 }

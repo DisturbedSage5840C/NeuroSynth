@@ -62,6 +62,53 @@ async def lifespan(app: FastAPI):
         app.state.redis = None
         logger.warning("redis_connect_failed", error=str(exc))
 
+    try:
+        from backend.biomarker_model import BiomarkerPredictor
+        from backend.causal_engine import NeuralCausalDiscovery
+        from backend.data_pipeline import DataPipeline
+        from backend.report_generator import ClinicalReportGenerator
+        from backend.temporal_model import TemporalProgressionModel
+
+        pipeline = DataPipeline()
+        X_train, X_test, y_train, y_test, feature_names, scaler, dataset_stats = pipeline.process()
+
+        predictor = BiomarkerPredictor(feature_names)
+        predictor.train(X_train.values, y_train.values)
+
+        temporal = TemporalProgressionModel(feature_names)
+        temporal.train_model(X_train.values, y_train.values)
+
+        causal_model = NeuralCausalDiscovery()
+        if pipeline.df_processed is not None:
+            causal_cols = [c for c in causal_model.variables if c in pipeline.df_processed.columns]
+            if len(causal_cols) == len(causal_model.variables):
+                causal_model.fit(pipeline.df_processed[causal_model.variables].values.astype(float))
+
+        reporter = ClinicalReportGenerator()
+        metrics = predictor.evaluate(X_test.values, y_test.values)
+
+        app.state.pipeline = pipeline
+        app.state.predictor = predictor
+        app.state.temporal = temporal
+        app.state.causal = causal_model
+        app.state.reporter = reporter
+        app.state.scaler = scaler
+        app.state.feature_names = feature_names
+        app.state.dataset_stats = dataset_stats
+        app.state.metrics = metrics
+        logger.info("ml_models_loaded")
+    except Exception as exc:
+        logger.warning("ml_models_load_failed", error=str(exc))
+        app.state.pipeline = None
+        app.state.predictor = None
+        app.state.temporal = None
+        app.state.causal = None
+        app.state.reporter = None
+        app.state.scaler = None
+        app.state.feature_names = []
+        app.state.dataset_stats = {}
+        app.state.metrics = {}
+
     yield
 
     await _drain_celery_queue()

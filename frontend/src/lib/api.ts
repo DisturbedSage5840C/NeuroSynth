@@ -30,18 +30,24 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return response.json() as Promise<T>;
 }
 
-export async function login(email: string, password: string): Promise<{ access_token: string; refresh_token: string; role: string; }> {
+export async function login(
+  username: string,
+  password: string,
+  role: string = "CLINICIAN"
+): Promise<{ access_token: string; refresh_token: string; role: string; }> {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ username: email, password, role: "CLINICIAN" }),
+    body: JSON.stringify({ username, password, role }),
   });
   if (!response.ok) throw new Error("Login failed");
-  const payload = await response.json();
-  const role = String(payload?.user?.role ?? "CLINICIAN").toLowerCase();
-  // Backend auth is cookie-based; keep lightweight client tokens for route guards.
-  return { access_token: "cookie-session", refresh_token: "cookie-session", role };
+  const data = await response.json();
+  return {
+    access_token: "",
+    refresh_token: "",
+    role: data.user.role,
+  };
 }
 
 export async function refreshToken(): Promise<boolean> {
@@ -53,8 +59,8 @@ export async function refreshToken(): Promise<boolean> {
 
   if (!response.ok) return false;
   const payload = await response.json();
-  const role = String(payload?.user?.role ?? authStore.getState().role ?? "CLINICIAN").toLowerCase();
-  authStore.getState().setTokens("cookie-session", "cookie-session", role);
+  const role = String(payload?.user?.role ?? authStore.getState().role ?? "CLINICIAN");
+  authStore.getState().setTokens("", "", role);
   return true;
 }
 

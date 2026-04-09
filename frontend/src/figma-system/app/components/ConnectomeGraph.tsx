@@ -1,14 +1,36 @@
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import type { ConnectomeNode, ConnectomeEdge } from '../data/mock-data';
 import { connectomeData } from '../data/mock-data';
+import type { AnalysisResult } from '../types/analysis';
 
-export function ConnectomeGraph() {
+interface ConnectomeGraphProps {
+  analysisResult?: AnalysisResult | null;
+}
+
+export function ConnectomeGraph({ analysisResult }: ConnectomeGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     if (!svgRef.current) return;
-    const { nodes, edges } = connectomeData;
+    const causalEdges = analysisResult?.causal_graph?.edges;
+    const fromCausal = Array.isArray(causalEdges) && causalEdges.length > 0;
+    const nodes = fromCausal
+      ? Array.from(
+          new Set(causalEdges.flatMap((e) => [String(e.from), String(e.to)]))
+        ).map((id, idx) => ({
+          id,
+          label: id,
+          region: 'causal',
+          activity: 0.3 + ((idx % 7) / 10),
+        }))
+      : connectomeData.nodes;
+    const edges = fromCausal
+      ? causalEdges.map((e) => ({
+          source: String(e.from),
+          target: String(e.to),
+          weight: Number(e.strength || 0.2),
+        }))
+      : connectomeData.edges;
     const width = svgRef.current.clientWidth || 400;
     const height = 320;
 
@@ -83,7 +105,7 @@ export function ConnectomeGraph() {
     });
 
     return () => simulation.stop();
-  }, []);
+  }, [analysisResult]);
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">

@@ -2,14 +2,34 @@ import { useState } from 'react';
 import { ChevronDown, ChevronRight, FileText, ExternalLink, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { clinicalReport } from '../data/mock-data';
 import { UncertaintyBadge } from './UncertaintyBadge';
+import { useAnalysisStore } from '../../../state/analysisStore';
 
 const modalityIcons: Record<string, string> = {
   imaging: '🧠', genomic: '🧬', lab: '🧪', wearable: '⌚', literature: '📄',
 };
 
-export function ReportViewer() {
+interface ReportViewerProps {
+  reportData?: {
+    sections: Record<string, string>;
+    generated_at?: string;
+    word_count?: number;
+  } | null;
+}
+
+export function ReportViewer({ reportData }: ReportViewerProps) {
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
   const [expandedEvidence, setExpandedEvidence] = useState<Set<string>>(new Set());
+  const stored = useAnalysisStore((s) => s.result?.report);
+  const effectiveReport = reportData ?? stored ?? null;
+  const sections = effectiveReport
+    ? Object.entries(effectiveReport.sections || {}).map(([title, content]) => ({
+        title,
+        content,
+        confidence: 0.85,
+        claims: [],
+        evidenceChain: [],
+      }))
+    : clinicalReport.sections;
 
   const toggleSection = (i: number) => {
     const s = new Set(expandedSections);
@@ -34,7 +54,7 @@ export function ReportViewer() {
           </div>
           <div className="flex items-center gap-4 mt-1 text-muted-foreground" style={{ fontSize: '12px' }}>
             <span className="font-mono">{clinicalReport.id}</span>
-            <span>Generated {new Date(clinicalReport.generatedAt).toLocaleString()}</span>
+            <span>Generated {effectiveReport?.generated_at ? new Date(effectiveReport.generated_at).toLocaleString() : new Date(clinicalReport.generatedAt).toLocaleString()}</span>
             <span className="font-mono">{clinicalReport.model}</span>
           </div>
         </div>
@@ -59,7 +79,7 @@ export function ReportViewer() {
 
       {/* Sections */}
       <div className="space-y-3">
-        {clinicalReport.sections.map((section, i) => (
+        {sections.map((section, i) => (
           <div key={i} className="bg-card border border-border rounded-lg overflow-hidden">
             {/* Section header */}
             <button
