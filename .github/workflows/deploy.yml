@@ -58,12 +58,15 @@ jobs:
         run: python scripts/release_gate.py
 
       - name: Build container image (local for scan)
+        if: matrix.python-version == '3.12'
         uses: docker/setup-buildx-action@v3
 
       - name: Docker build for Trivy scan
+        if: matrix.python-version == '3.12'
         run: docker buildx build --load -t $REGISTRY/$IMAGE_NAME:${{ github.sha }} .
 
       - name: Trivy security scan (SARIF)
+        if: matrix.python-version == '3.12'
         uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -71,6 +74,7 @@ jobs:
           output: trivy-results-${{ matrix.python-version }}-cpu.sarif
 
       - name: Upload Trivy SARIF
+        if: matrix.python-version == '3.12'
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results-${{ matrix.python-version }}-cpu.sarif
