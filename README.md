@@ -1,160 +1,155 @@
 # NeuroSynth
 
-NeuroSynth is a production clinical AI platform for neurological deterioration prediction.
-It combines multimodal imaging, genomics, wearable biomarkers, and longitudinal clinical data through a multi-phase ML pipeline, exposed by a FastAPI backend and a React frontend.
+NeuroSynth is a clinical AI platform for neurological risk analytics with:
 
-## Final Local Test URL
+- Synchronous disease/risk analysis APIs
+- Multi-disease classification (Alzheimer's, Parkinson's, MS, Epilepsy, ALS, Huntington's)
+- Longitudinal trajectory forecasting and SHAP explainability
+- Causal graph outputs and generated clinical reports
+- PostgreSQL persistence for patients and analysis history
+- React clinical dashboard, report viewer, explorer timeline, and model performance page
 
-Use this single URL to test the integrated app:
+## Single End-to-End Test Link
+
+Use one URL for the complete integrated app:
 
 - http://localhost:8000
 
-## Repository Layout
+## System Architecture
 
-- `backend/`: FastAPI API, auth/security, telemetry, rate limiting, async tasks, metrics.
-- `frontend/`: Vite + React application.
-  - Canonical UI source: `frontend/src/figma-system/`
-  - Main entrypoint: `frontend/src/main.tsx`
-- `src/neurosynth/`: core ML/data pipeline implementations.
-- `scripts/`: orchestration and release checks.
-- `tests/`: unit and integration tests.
-- `docs/`: generated documentation artifacts (HTML/PDF).
-
-## Quick Start (Integrated Local Stack)
-
-This starts Redis + Celery + FastAPI, serves the frontend from backend static hosting, and gives one URL for testing.
-
-1. Install Python dependencies:
-
-```bash
-.venv312/bin/python -m pip install -e '.[test]'
+```mermaid
+flowchart LR
+    A[React UI] -->|cookies + REST| B[FastAPI Backend]
+    B --> C[Risk/Temporal/Causal Models]
+    B --> D[Disease Classifier]
+    B --> E[Clinical Report Generator]
+    B --> F[(PostgreSQL)]
+    B --> G[(Redis)]
+    H[Celery Worker] --> G
+    H --> C
 ```
 
-2. Install frontend dependencies and build:
+## Clinical Data Flow
+
+```mermaid
+sequenceDiagram
+    participant U as Clinician UI
+    participant API as FastAPI
+    participant ML as ML Stack
+    participant DB as PostgreSQL
+
+    U->>API: POST /auth/login
+    API-->>U: session cookies
+    U->>API: POST /predictions/analyze
+    API->>ML: predictor + temporal + causal + disease classifier
+    ML-->>API: probability, trajectory, SHAP, disease profile, report
+    API->>DB: INSERT analyses
+    API-->>U: analysis payload
+    U->>API: GET /patients/{id}/analyses
+    API->>DB: SELECT history
+    API-->>U: timeline + comparison rows
+```
+
+## Feature Coverage Snapshot
+
+| Capability | Status | Primary Endpoints/UI |
+|---|---|---|
+| Auth cookies + role access | Implemented | `/auth/login`, `/auth/refresh` |
+| Synchronous risk analysis | Implemented | `/predictions/analyze` |
+| Multi-disease classification | Implemented | analyze response `disease_classification` |
+| Patient persistence | Implemented | `/patients/`, `/patients`, SQL schema |
+| Analysis persistence/history | Implemented | `/patients/{patient_id}/analyses` |
+| Report regeneration | Implemented | `/reports/generate`, Report tab actions |
+| Model performance dashboard | Implemented | `/predictions/model/performance`, `/predictions/model/feature_importance`, `/performance` |
+
+## Prerequisites
+
+- Python venv at `.venv`
+- Node/NPM for frontend build
+- Redis running on `localhost:6379`
+- PostgreSQL running on `localhost:5432`
+- DB DSN (default): `postgresql://postgres:postgres@localhost:5432/neurosynth`
+
+## One-Time Setup
+
+1. Install backend packages (including heavy ML runtime dependencies):
+
+```bash
+/Users/maruteymani/Documents/NeuroSynth/.venv/bin/pip install -e '.[test]'
+/Users/maruteymani/Documents/NeuroSynth/.venv/bin/pip install torch requests
+```
+
+2. Build frontend and publish static assets for backend hosting:
 
 ```bash
 cd frontend
 npm install
 npm run build
 cd ..
-```
-
-3. Refresh static assets served by backend:
-
-```bash
 rm -rf static
 mkdir -p static
 cp -R frontend/dist/* static/
 ```
 
-4. Start Redis (Terminal 1):
+3. Start PostgreSQL and apply schema:
+
+```bash
+brew services start postgresql@16
+PAGER=cat /opt/homebrew/opt/postgresql@16/bin/psql -d postgres -c "ALTER ROLE postgres WITH LOGIN PASSWORD 'postgres';"
+/opt/homebrew/opt/postgresql@16/bin/createdb -O postgres neurosynth || true
+PGPASSWORD=postgres /opt/homebrew/opt/postgresql@16/bin/psql -h localhost -U postgres -d neurosynth -f backend/db_schema.sql
+```
+
+4. Start Redis:
 
 ```bash
 redis-server --port 6379
 ```
 
-5. Start Celery worker (Terminal 2):
+5. Start backend API:
+
+```bash
+NEUROSYNTH_POSTGRES_DSN=postgresql://postgres:postgres@localhost:5432/neurosynth \
+NEUROSYNTH_REDIS_URL=redis://localhost:6379/0 \
+/Users/maruteymani/Documents/NeuroSynth/.venv/bin/python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
+```
+
+6. Optional: Start Celery worker:
 
 ```bash
 NEUROSYNTH_REDIS_URL=redis://localhost:6379/0 \
-.venv312/bin/python -m celery -A backend.celery_app:celery_app worker -l info --concurrency=1
+/Users/maruteymani/Documents/NeuroSynth/.venv/bin/python -m celery -A backend.celery_app:celery_app worker -l info --concurrency=1
 ```
 
-6. Start backend (Terminal 3):
+## Demo Credentials
+
+- `clinician@neurosynth.local` / `neurosynth`
+- `researcher@neurosynth.local` / `neurosynth`
+- `admin@neurosynth.local` / `neurosynth`
+
+## Verification Protocol (Science-Grade)
+
+1. Login works and protected routes render.
+2. Analyze endpoint returns model outputs with non-empty trajectory and SHAP values.
+3. Disease card shows predicted disease + probability bars.
+4. DB rows increment for both `patients` and `analyses`.
+5. Data Explorer timeline shows patient history and SHAP comparison.
+6. Performance page shows metrics, feature-importance bars, confusion matrix.
+7. Report tab supports regenerate + print/PDF export.
+
+## Useful Validation Commands
 
 ```bash
-NEUROSYNTH_REDIS_URL=redis://localhost:6379/0 \
-.venv312/bin/python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
+PGPASSWORD=postgres /opt/homebrew/opt/postgresql@16/bin/psql -h localhost -U postgres -d neurosynth -c "SELECT count(*) FROM patients; SELECT count(*) FROM analyses;"
 ```
-
-7. Open:
-
-- http://localhost:8000
-
-### Demo Login
-
-- Email/username: `clinician@neurosynth.local`
-- Password: `neurosynth`
-
-## Frontend (Dev Mode)
-
-### Install
 
 ```bash
-cd frontend
-npm install
+/Users/maruteymani/Documents/NeuroSynth/.venv/bin/python -m pytest -q /Users/maruteymani/Documents/NeuroSynth/tests/integration/test_pipeline_and_tasks_qa.py
 ```
-
-### Development
-
-```bash
-npm run dev
-```
-
-Default local URL:
-
-- `http://localhost:5173`
-
-### Production Build
-
-```bash
-npm run build
-```
-
-Build output is generated in `frontend/dist`.
-
-## Backend
-
-Python project constraints require Python 3.11/3.12.
-
-### Install (recommended env)
-
-```bash
-.venv312/bin/python -m pip install -e '.[test]'
-```
-
-### Run API
-
-```bash
-NEUROSYNTH_REDIS_URL=redis://localhost:6379/0 \
-.venv312/bin/python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
-```
-
-## Static Asset Serving
-
-Backend serves frontend from `static/` when present, including SPA fallback routes.
-
-Vite frontend builds to `frontend/dist`.
-
-## Testing
-
-Run full test suite:
-
-```bash
-.venv312/bin/python -m pytest -q --tb=short
-```
-
-## Release Gate
-
-Run release checks:
-
-```bash
-NEURO_JWKS_URL=https://example.local/jwks \
-NEURO_ALLOWED_ORIGINS=http://localhost:5173 \
-NEURO_REDIS_URL=redis://localhost:6379/0 \
-.venv312/bin/python scripts/release_gate.py
-```
-
-## Docker
-
-```bash
-docker compose up --build
-```
-
-Note: Docker commands require the local Docker daemon to be running.
 
 ## Troubleshooting
 
-- If `http://localhost:8000` shows API JSON instead of UI, rebuild frontend and copy to `static/` again.
-- If login or protected endpoints fail, make sure Redis and Celery are running.
-- `/ready` may report `database: false` locally if Postgres is not started; the UI demo flow can still run with Redis/Celery.
+- If model startup logs `ml_models_load_failed`, install missing Python package from stack trace and restart API.
+- If DB endpoints return fallback data, confirm `brew services list` shows `postgresql@16` started and re-run schema file.
+- If UI is stale, rebuild frontend and re-copy `frontend/dist` to `static/`.
+- If Docker build fails with daemon errors, start Docker Desktop first.

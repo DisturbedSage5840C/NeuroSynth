@@ -14,7 +14,7 @@ class DataPipeline:
 
     target_column = "Diagnosis"
     drop_columns = ["PatientID", "DoctorInCharge"]
-    categorical_columns = ["Gender", "Ethnicity", "EducationLevel"]
+    categorical_columns = ["Gender", "Ethnicity", "EducationLevel", "DiseaseType"]
 
     def __init__(self, csv_path: str | None = None, models_dir: str | Path = "models") -> None:
         if csv_path is None:
@@ -99,6 +99,8 @@ class DataPipeline:
                 continue
             df[col] = pd.to_numeric(df[col], errors="coerce")
             median_val = df[col].median()
+            if pd.isna(median_val):
+                median_val = 0.0
             df[col] = df[col].fillna(median_val)
 
         df[self.target_column] = pd.to_numeric(df[self.target_column], errors="coerce").fillna(0).astype(int)
