@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search, ChevronDown, ChevronUp, Activity, Brain, User } from 'lucide-react';
 import { patients as mockPatients, type Patient } from '../data/mock-data';
 import { usePatients } from '../hooks/usePatients';
@@ -19,8 +19,7 @@ export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('deteriorationProb');
   const [sortAsc, setSortAsc] = useState(false);
-
-  if (isLoading) return <SidebarSkeleton />;
+  const lastAutoSelected = useRef<string | null>(null);
 
   const displayPatients: Patient[] = patients.length ? patients : mockPatients;
 
@@ -41,7 +40,11 @@ export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
   useEffect(() => {
     if (!filtered.length) return;
     const hasSelected = filtered.some((p) => p.id === selectedId);
-    if (!hasSelected) onSelect(filtered[0].id);
+    const nextId = filtered[0].id;
+    if (!hasSelected && lastAutoSelected.current !== nextId) {
+      lastAutoSelected.current = nextId;
+      onSelect(nextId);
+    }
   }, [filtered, selectedId, onSelect]);
 
   const createPatient = useMutation({
@@ -62,6 +65,8 @@ export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
       if (data?.patient_id) onSelect(data.patient_id);
     },
   });
+
+  if (isLoading) return <SidebarSkeleton />;
 
   return (
     <div className="w-72 h-full flex flex-col border-r border-border bg-[var(--sidebar)]">
