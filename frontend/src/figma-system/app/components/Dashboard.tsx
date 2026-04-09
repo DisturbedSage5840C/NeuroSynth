@@ -10,15 +10,18 @@ import { PatientInputPanel } from './PatientInputPanel';
 import { useAnalysisStore } from '../../../state/analysisStore';
 import type { AnalysisResult } from '../types/analysis';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { usePatients } from '../hooks/usePatients';
 
 interface DashboardProps {
   selectedPatientId: string;
 }
 
 export function Dashboard({ selectedPatientId }: DashboardProps) {
+  const { data: livePatients = [] } = usePatients();
   const analysisResult = useAnalysisStore((s) => s.result);
   const setResult = useAnalysisStore((s) => s.setResult);
-  const patient = patients.find(p => p.id === selectedPatientId) || patients[0];
+  const allPatients = livePatients.length ? livePatients : patients;
+  const patient = allPatients.find((p) => p.id === selectedPatientId) || allPatients[0];
   const probability = analysisResult?.probability ?? patient.deteriorationProb;
   const riskLevel = useMemo(() => {
     if (!analysisResult) return patient.riskLevel;
@@ -47,7 +50,7 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
   return (
     <div className="flex flex-1 overflow-hidden">
       <aside className="w-96 border-r border-border bg-card/40">
-        <PatientInputPanel onResult={setResult} />
+        <PatientInputPanel onResult={setResult} patientId={patient.id} />
       </aside>
 
       <div className="flex-1 overflow-y-auto p-6">

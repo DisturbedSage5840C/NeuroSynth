@@ -92,6 +92,14 @@ async def analyze_patient(
         disease_result = disease_clf.predict_disease(payload.features) if disease_clf else {}
 
         if db.pool:
+            await db.pool.execute(
+                "INSERT INTO patients (id, name, diagnosis, created_at, updated_at) "
+                "VALUES ($1, $2, $3, NOW(), NOW()) "
+                "ON CONFLICT (id) DO UPDATE SET updated_at = EXCLUDED.updated_at",
+                payload.patient_id,
+                f"Patient {payload.patient_id}",
+                "Neurology Monitoring",
+            )
             analysis_id = uuid4().hex
             await db.pool.execute(
                 "INSERT INTO analyses (id, patient_id, features, probability, risk_level, "
@@ -169,6 +177,14 @@ async def analyze_patient(
     disease_result = disease_clf.predict_disease(payload.features) if disease_clf else {}
 
     if db.pool:
+        await db.pool.execute(
+            "INSERT INTO patients (id, name, diagnosis, created_at, updated_at) "
+            "VALUES ($1, $2, $3, NOW(), NOW()) "
+            "ON CONFLICT (id) DO UPDATE SET updated_at = EXCLUDED.updated_at",
+            payload.patient_id,
+            f"Patient {payload.patient_id}",
+            "Neurology Monitoring",
+        )
         analysis_id = uuid4().hex
         await db.pool.execute(
             "INSERT INTO analyses (id, patient_id, features, probability, risk_level, "

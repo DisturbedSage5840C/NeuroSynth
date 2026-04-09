@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, ChevronDown, ChevronUp, Activity, Brain, User } from 'lucide-react';
 import { patients as mockPatients, type Patient } from '../data/mock-data';
 import { usePatients } from '../hooks/usePatients';
 import { RiskBadge } from './UncertaintyBadge';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '../../../lib/api';
 
 interface PatientSidebarProps {
   selectedId: string;
@@ -13,6 +15,7 @@ type SortKey = 'deteriorationProb' | 'name' | 'lastUpdated';
 
 export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
   const { data: patients = [], isLoading } = usePatients();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('deteriorationProb');
   const [sortAsc, setSortAsc] = useState(false);
@@ -35,6 +38,31 @@ export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
     else { setSortKey(key); setSortAsc(false); }
   };
 
+  useEffect(() => {
+    if (!filtered.length) return;
+    const hasSelected = filtered.some((p) => p.id === selectedId);
+    if (!hasSelected) onSelect(filtered[0].id);
+  }, [filtered, selectedId, onSelect]);
+
+  const createPatient = useMutation({
+    mutationFn: () => {
+      const suffix = String(Date.now()).slice(-4);
+      const params = new URLSearchParams({
+        name: `New Patient ${suffix}`,
+        age: '62',
+        sex: 'F',
+        diagnosis: 'Neurology Monitoring',
+      });
+      return apiFetch<{ patient_id: string }>(`/patients/?${params.toString()}`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({ queryKey: ['patients'] });
+      if (data?.patient_id) onSelect(data.patient_id);
+    },
+  });
+
   return (
     <div className="w-72 h-full flex flex-col border-r border-border bg-[var(--sidebar)]">
       {/* Header */}
@@ -54,6 +82,13 @@ export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
             style={{ fontSize: '12px' }}
           />
         </div>
+        <button
+          onClick={() => createPatient.mutate()}
+          disabled={createPatient.isPending}
+          className="mt-3 w-full rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+        >
+          {createPatient.isPending ? 'Creating...' : 'Add New Patient'}
+        </button>
       </div>
 
       {/* Sort controls */}

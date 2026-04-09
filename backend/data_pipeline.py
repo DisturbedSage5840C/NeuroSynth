@@ -83,6 +83,7 @@ class DataPipeline:
     ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, list[str], StandardScaler, dict[str, Any]]:
         df = self._load()
         self.df_raw = df.copy()
+        source_rows = int(len(df))
 
         for col in self.drop_columns:
             if col in df.columns:
@@ -90,6 +91,14 @@ class DataPipeline:
 
         if self.target_column not in df.columns:
             raise ValueError("Diagnosis target column is missing from dataset")
+
+        # If expanded multi-disease data is present, keep diagnosis-risk training aligned
+        # with the Alzheimer's clinical target used by the risk model.
+        if "DiseaseType" in df.columns:
+            ad_mask = df["DiseaseType"].astype(str).str.strip().str.lower().eq("alzheimer's disease")
+            ad_df = df[ad_mask].copy()
+            if len(ad_df) >= 500:
+                df = ad_df
 
         df = self._encode_categoricals(df)
 
@@ -104,6 +113,9 @@ class DataPipeline:
             df[col] = df[col].fillna(median_val)
 
         df[self.target_column] = pd.to_numeric(df[self.target_column], errors="coerce").fillna(0).astype(int)
+
+        if "DiseaseType" in df.columns:
+            df = df.drop(columns=["DiseaseType"])
 
         feature_names = [c for c in df.columns if c != self.target_column]
         self.feature_names = feature_names
@@ -126,6 +138,8 @@ class DataPipeline:
         self.scaler = scaler
         self.df_processed = df
         self.dataset_stats = self._build_dataset_stats(df, feature_names)
+        self.dataset_stats["source_n_patients"] = source_rows
+        self.dataset_stats["training_cohort"] = "alzheimers_only" if source_rows != len(df) else "full_dataset"
 
         joblib.dump(scaler, self.models_dir / "scaler.pkl")
 

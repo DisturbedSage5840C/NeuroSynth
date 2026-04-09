@@ -9,6 +9,7 @@ from sklearn.ensemble import ExtraTreesClassifier, GradientBoostingClassifier, R
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
+    balanced_accuracy_score,
     classification_report,
     confusion_matrix,
     f1_score,
@@ -71,6 +72,7 @@ class BiomarkerPredictor:
         self.lr = LogisticRegression(C=1.0, max_iter=1000, class_weight="balanced", random_state=42)
         self.weights = np.array([0.35, 0.35, 0.20, 0.10], dtype=float)
         self.tree_explainer: Any | None = None
+        self.decision_threshold: float = 0.5
 
     @staticmethod
     def _risk_level(prob: float) -> str:
@@ -99,6 +101,18 @@ class BiomarkerPredictor:
 
         if shap is not None:
             self.tree_explainer = shap.TreeExplainer(self.rf)
+
+        probs, _ = self._ensemble_probs(X_train)
+        thresholds = np.linspace(0.35, 0.75, 41)
+        best_t = 0.5
+        best_score = -1.0
+        for t in thresholds:
+            y_hat = (probs >= t).astype(int)
+            score = 0.6 * balanced_accuracy_score(y_train, y_hat) + 0.4 * accuracy_score(y_train, y_hat)
+            if score > best_score:
+                best_score = float(score)
+                best_t = float(t)
+        self.decision_threshold = best_t
 
         joblib.dump(self.rf, self.models_dir / "rf_model.pkl")
         joblib.dump(self.gb, self.models_dir / "gb_model.pkl")
@@ -145,7 +159,7 @@ class BiomarkerPredictor:
     def predict(self, X: np.ndarray) -> dict[str, Any]:
         ensemble, per_model = self._ensemble_probs(X)
         prob = float(np.clip(ensemble[0], 0.0, 1.0))
-        pred = int(prob >= 0.5)
+        pred = int(prob >= self.decision_threshold)
 
         shap_vals = self.get_shap_values(X[:1])[0]
         top_idx = np.argsort(np.abs(shap_vals))[::-1][:5]
@@ -180,7 +194,7 @@ class BiomarkerPredictor:
 
     def evaluate(self, X_test: np.ndarray, y_test: np.ndarray) -> dict[str, Any]:
         ensemble, _ = self._ensemble_probs(X_test)
-        y_pred = (ensemble >= 0.5).astype(int)
+        y_pred = (ensemble >= self.decision_threshold).astype(int)
 
         return {
             "accuracy": round(float(accuracy_score(y_test, y_pred)), 4),
@@ -190,4 +204,5 @@ class BiomarkerPredictor:
             "recall": round(float(recall_score(y_test, y_pred, zero_division=0)), 4),
             "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
             "classification_report": classification_report(y_test, y_pred, output_dict=True, zero_division=0),
+            "decision_threshold": round(float(self.decision_threshold), 4),
         }

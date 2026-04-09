@@ -45,9 +45,10 @@ const SECTIONS = ["Demographics", "Lifestyle", "Medical History", "Clinical Meas
 
 interface PatientInputPanelProps {
   onResult: (result: AnalysisResult) => void;
+  patientId: string;
 }
 
-export function PatientInputPanel({ onResult }: PatientInputPanelProps) {
+export function PatientInputPanel({ onResult, patientId }: PatientInputPanelProps) {
   const defaults = useMemo(
     () => Object.fromEntries(PATIENT_FIELDS.map((f) => [f.key, f.default])) as Record<string, number>,
     []
@@ -60,7 +61,7 @@ export function PatientInputPanel({ onResult }: PatientInputPanelProps) {
       apiFetch<AnalysisResult>("/predictions/analyze", {
         method: "POST",
         body: JSON.stringify({
-          patient_id: `manual-${Date.now()}`,
+          patient_id: patientId,
           features,
         }),
       }),

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
 import { apiFetch } from '../../../lib/api';
+import { timelineEvents } from '../data/mock-data';
 
 type Modality = 'all' | 'imaging' | 'genomic' | 'lab' | 'wearable' | 'clinical';
 
