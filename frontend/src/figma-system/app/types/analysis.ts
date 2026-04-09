@@ -19,4 +19,9 @@ export type AnalysisResult = {
     generated_at?: string;
     word_count?: number;
   };
+  disease_classification?: {
+    predicted_disease?: string;
+    disease_probabilities?: Record<string, number>;
+    confidence?: string;
+  };
 };

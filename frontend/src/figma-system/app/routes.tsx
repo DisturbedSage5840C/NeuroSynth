@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { ReportViewer } from './components/ReportViewer';
 import { DataExplorer } from './components/DataExplorer';
+import { PerformanceDashboard } from './components/PerformanceDashboard';
 import { LoginPage } from '../../features/auth/LoginPage';
 import { useOutletContext } from 'react-router';
 import { useAuthStore } from '../../state/authStore';
@@ -33,6 +34,7 @@ export const router = createBrowserRouter([
       { index: true, Component: DashboardPage },
       { path: 'report', Component: ReportViewer },
       { path: 'explorer', Component: DataExplorer },
+      { path: 'performance', Component: PerformanceDashboard },
     ],
   },
 ]);

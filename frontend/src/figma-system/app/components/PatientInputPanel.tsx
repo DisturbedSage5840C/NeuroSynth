@@ -81,6 +81,16 @@ export function PatientInputPanel({ onResult }: PatientInputPanelProps) {
 
   return (
     <div className="h-full overflow-y-auto p-4">
+      <button
+        onClick={() => {
+          setFields(defaults);
+          setError('');
+        }}
+        className="mb-3 w-full rounded border border-border px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
+      >
+        New Analysis
+      </button>
+
       {SECTIONS.map((section) => (
         <div key={section} className="mb-4 rounded-lg border border-border bg-card p-3">
           <h3 className="mb-3 font-mono text-primary" style={{ fontSize: "11px", letterSpacing: "0.06em" }}>

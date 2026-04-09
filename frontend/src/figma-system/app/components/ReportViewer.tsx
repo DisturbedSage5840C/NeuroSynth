@@ -3,6 +3,9 @@ import { ChevronDown, ChevronRight, FileText, ExternalLink, AlertTriangle, Check
 import { clinicalReport } from '../data/mock-data';
 import { UncertaintyBadge } from './UncertaintyBadge';
 import { useAnalysisStore } from '../../../state/analysisStore';
+import { useMutation } from '@tanstack/react-query';
+import { apiFetch } from '../../../lib/api';
+import { useOutletContext } from 'react-router';
 
 const modalityIcons: Record<string, string> = {
   imaging: '🧠', genomic: '🧬', lab: '🧪', wearable: '⌚', literature: '📄',
@@ -19,7 +22,10 @@ interface ReportViewerProps {
 export function ReportViewer({ reportData }: ReportViewerProps) {
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
   const [expandedEvidence, setExpandedEvidence] = useState<Set<string>>(new Set());
-  const stored = useAnalysisStore((s) => s.result?.report);
+  const { selectedPatientId } = useOutletContext<{ selectedPatientId: string }>();
+  const storedResult = useAnalysisStore((s) => s.result);
+  const stored = storedResult?.report;
+  const setResult = useAnalysisStore((s) => s.setResult);
   const effectiveReport = reportData ?? stored ?? null;
   const sections = effectiveReport
     ? Object.entries(effectiveReport.sections || {}).map(([title, content]) => ({
@@ -43,6 +49,28 @@ export function ReportViewer({ reportData }: ReportViewerProps) {
     setExpandedEvidence(s);
   };
 
+  const regenerate = useMutation({
+    mutationFn: () =>
+      apiFetch<{ status: string; report?: { sections: Record<string, string>; generated_at?: string; word_count?: number } }>(
+        '/reports/generate',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            patient_id: storedResult?.patient_id || selectedPatientId,
+            notes: 'Regenerate with latest model context',
+          }),
+        }
+      ),
+    onSuccess: (payload) => {
+      if (payload.report && storedResult) {
+        setResult({
+          ...storedResult,
+          report: payload.report,
+        });
+      }
+    },
+  });
+
   return (
     <div className="flex-1 overflow-y-auto p-6">
       {/* Header */}
@@ -59,6 +87,18 @@ export function ReportViewer({ reportData }: ReportViewerProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => regenerate.mutate()}
+            className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {regenerate.isPending ? 'Regenerating...' : 'Regenerate Report'}
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Download as PDF
+          </button>
           <span className="px-2 py-1 rounded bg-primary/10 text-primary font-mono" style={{ fontSize: '10px' }}>
             AI-GENERATED
           </span>

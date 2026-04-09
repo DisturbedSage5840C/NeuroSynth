@@ -9,6 +9,7 @@ import { Calendar, MapPin, Stethoscope } from 'lucide-react';
 import { PatientInputPanel } from './PatientInputPanel';
 import { useAnalysisStore } from '../../../state/analysisStore';
 import type { AnalysisResult } from '../types/analysis';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 interface DashboardProps {
   selectedPatientId: string;
@@ -27,6 +28,21 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
     if (level.includes('moderate')) return 'moderate';
     return 'low';
   }, [analysisResult, patient.riskLevel]);
+
+  const disease = analysisResult?.disease_classification;
+  const diseaseRows = Object.entries(disease?.disease_probabilities || {})
+    .map(([name, prob]) => ({ name, probability: Number(prob) }))
+    .sort((a, b) => b.probability - a.probability);
+
+  const diseaseColor = (name: string) => {
+    if (name.includes('Alzheimer')) return 'var(--risk-critical)';
+    if (name.includes('Parkinson')) return 'var(--risk-high)';
+    if (name.includes('Multiple Sclerosis')) return 'var(--risk-moderate)';
+    if (name.includes('Epilepsy')) return 'var(--chart-3)';
+    if (name.includes('ALS')) return 'var(--risk-critical)';
+    if (name.includes('Huntington')) return 'var(--chart-4)';
+    return 'var(--primary)';
+  };
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -70,6 +86,40 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
           <div className="grid grid-cols-2 gap-4">
             <ConnectomeGraph analysisResult={analysisResult as AnalysisResult | null} />
             <GenomicHeatmap analysisResult={analysisResult as AnalysisResult | null} />
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-foreground">Disease Profile</h3>
+              <span className="rounded px-2 py-0.5 text-xs" style={{ background: 'var(--secondary)', color: 'var(--muted-foreground)' }}>
+                {disease?.confidence || 'N/A'} confidence
+              </span>
+            </div>
+
+            <div className="mb-3">
+              <div
+                className="text-lg font-semibold"
+                style={{ color: disease?.predicted_disease ? diseaseColor(disease.predicted_disease) : 'var(--muted-foreground)' }}
+              >
+                {disease?.predicted_disease || 'Run analysis to classify disease type'}
+              </div>
+            </div>
+
+            {diseaseRows.length ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={diseaseRows} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="name" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={70} />
+                  <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} domain={[0, 1]} />
+                  <Tooltip formatter={(value: number) => `${Math.round(value * 100)}%`} />
+                  <Bar dataKey="probability" radius={[4, 4, 0, 0]} fill="var(--primary)" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[220px] items-center justify-center text-xs text-muted-foreground">
+                Disease probabilities will appear after analysis.
+              </div>
+            )}
           </div>
         </div>
       </div>

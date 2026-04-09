@@ -63,6 +63,17 @@ async def lifespan(app: FastAPI):
         logger.warning("redis_connect_failed", error=str(exc))
 
     try:
+        from backend.disease_classifier import DiseaseClassifier
+
+        disease_clf = DiseaseClassifier()
+        disease_clf.train()
+        app.state.disease_classifier = disease_clf
+        logger.info("disease_classifier_trained")
+    except Exception as exc:
+        app.state.disease_classifier = None
+        logger.warning("disease_classifier_failed", error=str(exc))
+
+    try:
         from backend.biomarker_model import BiomarkerPredictor
         from backend.causal_engine import NeuralCausalDiscovery
         from backend.data_pipeline import DataPipeline

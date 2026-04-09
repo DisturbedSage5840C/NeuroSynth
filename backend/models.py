@@ -139,6 +139,7 @@ class ReportResponse(BaseModel):
     task_id: str
     patient_id: str
     status: str
+    report: dict[str, Any] | None = None
 
 
 class CausalRequest(BaseModel):

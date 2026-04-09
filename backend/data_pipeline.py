@@ -17,7 +17,12 @@ class DataPipeline:
     categorical_columns = ["Gender", "Ethnicity", "EducationLevel"]
 
     def __init__(self, csv_path: str | None = None, models_dir: str | Path = "models") -> None:
-        self.csv_path = Path(csv_path) if csv_path else Path("alzheimers_disease_data.csv")
+        if csv_path is None:
+            if Path("neurological_disease_data.csv").exists():
+                csv_path = "neurological_disease_data.csv"
+            else:
+                csv_path = "alzheimers_disease_data.csv"
+        self.csv_path = Path(csv_path)
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(parents=True, exist_ok=True)
 

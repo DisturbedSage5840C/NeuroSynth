@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, NavLink } from 'react-router';
-import { LayoutDashboard, FileText, Database, Brain } from 'lucide-react';
+import { LayoutDashboard, FileText, Database, Brain, BarChart2 } from 'lucide-react';
 import { PatientSidebar } from './PatientSidebar';
 import { patients } from '../data/mock-data';
 
@@ -8,6 +8,7 @@ const navItems = [
   { to: '/', icon: <LayoutDashboard size={16} />, label: 'Dashboard' },
   { to: '/report', icon: <FileText size={16} />, label: 'Report' },
   { to: '/explorer', icon: <Database size={16} />, label: 'Explorer' },
+  { to: '/performance', icon: <BarChart2 size={16} />, label: 'Performance' },
 ];
 
 export function Layout() {

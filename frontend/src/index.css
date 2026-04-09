@@ -39,6 +39,8 @@
   --risk-moderate-bg: rgba(234, 179, 8, 0.12);
   --risk-low: #22c55e;
   --risk-low-bg: rgba(34, 197, 94, 0.12);
+  --chart-3: #06b6d4;
+  --chart-4: #8b5cf6;
 }
 
 body {
@@ -61,5 +63,32 @@ a {
   * {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  button {
+    display: none !important;
+  }
+
+  .bg-card,
+  .bg-secondary,
+  .bg-background {
+    background: #ffffff !important;
+  }
+
+  .text-foreground,
+  .text-muted-foreground {
+    color: #111111 !important;
+  }
+
+  .border,
+  .border-border {
+    border-color: #cfcfcf !important;
   }
 }

@@ -1,6 +1,18 @@
-import { useState } from 'react';
-import { timelineEvents } from '../data/mock-data';
-import { Brain, Dna, FlaskConical, Watch, Stethoscope, Sliders, Play, RotateCcw } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useOutletContext } from 'react-router';
+import {
+  Brain,
+  Dna,
+  FlaskConical,
+  Watch,
+  Stethoscope,
+  Sliders,
+  Play,
+  RotateCcw,
+} from 'lucide-react';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { apiFetch } from '../../../lib/api';
 
 type Modality = 'all' | 'imaging' | 'genomic' | 'lab' | 'wearable' | 'clinical';
 
@@ -18,11 +30,50 @@ const flagStyles: Record<string, string> = {
   critical: 'text-[var(--risk-critical)] bg-[var(--risk-critical-bg)]',
 };
 
+type HistoryItem = {
+  id: string;
+  probability: number;
+  risk_level: string;
+  confidence: string;
+  trajectory: number[];
+  shap_values: Array<{ feature: string; value: number }>;
+  disease_classification?: { predicted_disease?: string };
+  created_at: string;
+};
+
 export function DataExplorer() {
+  const { selectedPatientId } = useOutletContext<{ selectedPatientId: string }>();
   const [filter, setFilter] = useState<Modality>('all');
   const [simOpen, setSimOpen] = useState(false);
   const [simParam, setSimParam] = useState(50);
   const [simRunning, setSimRunning] = useState(false);
+  const [leftSelection, setLeftSelection] = useState<string | null>(null);
+  const [rightSelection, setRightSelection] = useState<string | null>(null);
+
+  const historyQuery = useQuery({
+    queryKey: ['patient-history', selectedPatientId],
+    queryFn: () => apiFetch<{ items: HistoryItem[] }>(`/patients/${selectedPatientId}/analyses`),
+  });
+
+  const historyItems = historyQuery.data?.items || [];
+  const chartData = historyItems
+    .slice()
+    .reverse()
+    .map((h, i) => ({
+      idx: i + 1,
+      probability: Number(h.probability || 0),
+      created_at: h.created_at,
+      id: h.id,
+    }));
+
+  const selectedLeft = useMemo(
+    () => historyItems.find((h) => h.id === leftSelection) || historyItems[0],
+    [historyItems, leftSelection]
+  );
+  const selectedRight = useMemo(
+    () => historyItems.find((h) => h.id === rightSelection) || historyItems[1] || historyItems[0],
+    [historyItems, rightSelection]
+  );
 
   const filtered = filter === 'all' ? timelineEvents : timelineEvents.filter(e => e.modality === filter);
 
@@ -116,6 +167,76 @@ export function DataExplorer() {
               );
             })}
           </div>
+        </div>
+
+        <div className="mt-6 rounded-lg border border-border bg-card p-4">
+          <h3 className="mb-3 text-sm font-medium text-foreground">Patient Risk Timeline</h3>
+          {chartData.length ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={chartData} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="idx" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} />
+                <YAxis domain={[0, 1]} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} />
+                <Tooltip
+                  formatter={(value: number) => `${Math.round(value * 100)}%`}
+                  labelFormatter={(v) => `Analysis #${v}`}
+                />
+                <Line type="monotone" dataKey="probability" stroke="var(--primary)" strokeWidth={2} dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-xs text-muted-foreground">No stored analyses yet for this patient.</div>
+          )}
+
+          {historyItems.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div className="rounded border border-border p-3">
+                <h4 className="mb-2 text-xs text-muted-foreground">Select Analysis A</h4>
+                <select
+                  className="mb-3 w-full rounded border border-border bg-secondary px-2 py-1 text-xs"
+                  value={selectedLeft?.id || ''}
+                  onChange={(e) => setLeftSelection(e.target.value)}
+                >
+                  {historyItems.map((h) => (
+                    <option key={h.id} value={h.id}>{new Date(h.created_at).toLocaleString()}</option>
+                  ))}
+                </select>
+                <ScatterChart width={340} height={160}>
+                  <CartesianGrid stroke="var(--border)" />
+                  <XAxis type="number" dataKey="i" name="Rank" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} />
+                  <YAxis type="number" dataKey="v" name="SHAP" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} />
+                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                  <Scatter
+                    data={(selectedLeft?.shap_values || []).slice(0, 12).map((s, i) => ({ i: i + 1, v: Number(s.value || 0), feature: s.feature }))}
+                    fill="var(--risk-high)"
+                  />
+                </ScatterChart>
+              </div>
+
+              <div className="rounded border border-border p-3">
+                <h4 className="mb-2 text-xs text-muted-foreground">Select Analysis B</h4>
+                <select
+                  className="mb-3 w-full rounded border border-border bg-secondary px-2 py-1 text-xs"
+                  value={selectedRight?.id || ''}
+                  onChange={(e) => setRightSelection(e.target.value)}
+                >
+                  {historyItems.map((h) => (
+                    <option key={h.id} value={h.id}>{new Date(h.created_at).toLocaleString()}</option>
+                  ))}
+                </select>
+                <ScatterChart width={340} height={160}>
+                  <CartesianGrid stroke="var(--border)" />
+                  <XAxis type="number" dataKey="i" name="Rank" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} />
+                  <YAxis type="number" dataKey="v" name="SHAP" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} />
+                  <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                  <Scatter
+                    data={(selectedRight?.shap_values || []).slice(0, 12).map((s, i) => ({ i: i + 1, v: Number(s.value || 0), feature: s.feature }))}
+                    fill="var(--risk-moderate)"
+                  />
+                </ScatterChart>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

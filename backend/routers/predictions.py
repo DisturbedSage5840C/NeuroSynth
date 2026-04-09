@@ -1,4 +1,5 @@
 from uuid import uuid4
+import json
 
 import pandas as pd
 import pandera as pa
@@ -6,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pandera.typing import DataFrame, Series
 
 from backend.core.rate_limit import limiter, role_limit
-from backend.deps import get_current_user
+from backend.db import Database
+from backend.deps import get_current_user, get_database
 from backend.models import FeatureVector, PredictionResponse, UserContext
 from backend.tasks import enqueue_full_pipeline
 
@@ -58,14 +60,26 @@ async def analyze_patient(
     payload: FeatureVector,
     request: Request,
     user: UserContext = Depends(get_current_user),
+    db: Database = Depends(get_database),
 ):
     _ = user
     predictor = getattr(request.app.state, "predictor", None)
     temporal = getattr(request.app.state, "temporal", None)
     causal_model = getattr(request.app.state, "causal", None)
     reporter = getattr(request.app.state, "reporter", None)
+    disease_clf = getattr(request.app.state, "disease_classifier", None)
     scaler = getattr(request.app.state, "scaler", None)
     feature_names = getattr(request.app.state, "feature_names", None)
+
+    if disease_clf is None:
+        try:
+            from backend.disease_classifier import DiseaseClassifier
+
+            disease_clf = DiseaseClassifier()
+            disease_clf.train()
+            request.app.state.disease_classifier = disease_clf
+        except Exception:
+            disease_clf = None
 
     if predictor is None or scaler is None or not feature_names:
         keys = list(payload.features.keys())
@@ -75,12 +89,36 @@ async def analyze_patient(
         ]
         base_prob = 0.5
         trajectory = [round(base_prob + i * 0.02, 4) for i in range(6)]
+        disease_result = disease_clf.predict_disease(payload.features) if disease_clf else {}
+
+        if db.pool:
+            analysis_id = uuid4().hex
+            await db.pool.execute(
+                "INSERT INTO analyses (id, patient_id, features, probability, risk_level, "
+                "confidence, trajectory, shap_values, causal_graph, report_sections, disease_classification) "
+                "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+                analysis_id,
+                payload.patient_id,
+                json.dumps(payload.features),
+                base_prob,
+                "moderate",
+                "Medium",
+                json.dumps(trajectory),
+                json.dumps(shap_top),
+                json.dumps({"nodes": [], "edges": []}),
+                json.dumps({
+                    "Clinical Summary": "Fallback analysis returned because models are not loaded.",
+                    "Recommendations": "Restart backend after dependencies are available for full model inference.",
+                }),
+                json.dumps(disease_result),
+            )
+
         return {
             "patient_id": payload.patient_id,
             "prediction": 0,
             "probability": base_prob,
             "risk_level": "moderate",
-            "confidence": 0.7,
+            "confidence": "Medium",
             "individual_model_probs": {"rf": base_prob, "xgb": base_prob, "lgb": base_prob},
             "top_risk_factors": [item["feature"] for item in shap_top[:5]],
             "shap_values": shap_top,
@@ -98,6 +136,7 @@ async def analyze_patient(
                 "generated_at": "",
                 "word_count": 17,
             },
+            "disease_classification": disease_result,
         }
 
     frame = pd.DataFrame([{k: float(payload.features.get(k, 0.0)) for k in feature_names}])
@@ -127,6 +166,27 @@ async def analyze_patient(
         shap_values=shap_top,
     ) if reporter else {"sections": {}, "raw_text": ""}
 
+    disease_result = disease_clf.predict_disease(payload.features) if disease_clf else {}
+
+    if db.pool:
+        analysis_id = uuid4().hex
+        await db.pool.execute(
+            "INSERT INTO analyses (id, patient_id, features, probability, risk_level, "
+            "confidence, trajectory, shap_values, causal_graph, report_sections, disease_classification) "
+            "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+            analysis_id,
+            payload.patient_id,
+            json.dumps(payload.features),
+            pred["probability"],
+            pred["risk_level"],
+            pred["confidence"],
+            json.dumps(traj["trajectory"]),
+            json.dumps(shap_top),
+            json.dumps(causal_graph),
+            json.dumps(report.get("sections", {})),
+            json.dumps(disease_result),
+        )
+
     return {
         "patient_id": payload.patient_id,
         "prediction": pred["prediction"],
@@ -140,6 +200,7 @@ async def analyze_patient(
         "confidence_bands": traj["confidence_bands"],
         "causal_graph": causal_graph,
         "report": report,
+        "disease_classification": disease_result,
     }
 
 
