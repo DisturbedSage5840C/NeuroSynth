@@ -19,5 +19,6 @@
     "**/.venv312/**": true,
     "**/__pycache__/**": true,
     "**/.pytest_cache/**": true
-  }
+  },
+  "azureTerraform.checkTerraformCmd": false
 }

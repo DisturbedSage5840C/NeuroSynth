@@ -42,6 +42,28 @@ type HistoryItem = {
   created_at: string;
 };
 
+function normalizeShapValues(input: unknown): Array<{ feature: string; value: number }> {
+  const parseMaybeJson = (raw: unknown) => {
+    if (typeof raw !== 'string') return raw;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  };
+
+  const parsed = parseMaybeJson(input);
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const feature = String((item as { feature?: unknown }).feature ?? 'unknown');
+      const value = Number((item as { value?: unknown }).value ?? 0);
+      return { feature, value };
+    })
+    .filter((item): item is { feature: string; value: number } => item !== null);
+}
+
 export function DataExplorer() {
   const { selectedPatientId } = useOutletContext<{ selectedPatientId: string }>();
   const [filter, setFilter] = useState<Modality>('all');
@@ -56,7 +78,9 @@ export function DataExplorer() {
     queryFn: () => apiFetch<{ items: HistoryItem[] }>(`/patients/${selectedPatientId}/analyses`),
   });
 
-  const historyItems = historyQuery.data?.items || [];
+  const historyItems = Array.isArray(historyQuery.data?.items)
+    ? historyQuery.data.items
+    : [];
   const chartData = historyItems
     .slice()
     .reverse()
@@ -208,7 +232,9 @@ export function DataExplorer() {
                   <YAxis type="number" dataKey="v" name="SHAP" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} />
                   <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                   <Scatter
-                    data={(selectedLeft?.shap_values || []).slice(0, 12).map((s, i) => ({ i: i + 1, v: Number(s.value || 0), feature: s.feature }))}
+                    data={normalizeShapValues(selectedLeft?.shap_values)
+                      .slice(0, 12)
+                      .map((s, i) => ({ i: i + 1, v: Number(s.value || 0), feature: s.feature }))}
                     fill="var(--risk-high)"
                   />
                 </ScatterChart>
@@ -231,7 +257,9 @@ export function DataExplorer() {
                   <YAxis type="number" dataKey="v" name="SHAP" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} />
                   <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                   <Scatter
-                    data={(selectedRight?.shap_values || []).slice(0, 12).map((s, i) => ({ i: i + 1, v: Number(s.value || 0), feature: s.feature }))}
+                    data={normalizeShapValues(selectedRight?.shap_values)
+                      .slice(0, 12)
+                      .map((s, i) => ({ i: i + 1, v: Number(s.value || 0), feature: s.feature }))}
                     fill="var(--risk-moderate)"
                   />
                 </ScatterChart>
