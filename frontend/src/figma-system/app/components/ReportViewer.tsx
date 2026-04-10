@@ -20,20 +20,19 @@ interface ReportViewerProps {
 }
 
 export function ReportViewer({ reportData }: ReportViewerProps) {
+  const analysisResult = useAnalysisStore((s) => s.result);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
   const [expandedEvidence, setExpandedEvidence] = useState<Set<string>>(new Set());
   const { selectedPatientId } = useOutletContext<{ selectedPatientId: string }>();
-  const storedResult = useAnalysisStore((s) => s.result);
-  const stored = storedResult?.report;
   const setResult = useAnalysisStore((s) => s.setResult);
-  const effectiveReport = reportData ?? stored ?? null;
-  const sections = effectiveReport
-    ? Object.entries(effectiveReport.sections || {}).map(([title, content]) => ({
+  const effectiveReport = reportData ?? analysisResult?.report ?? null;
+  const sections = analysisResult?.report?.sections
+    ? Object.entries(analysisResult.report.sections).map(([title, content]) => ({
         title,
-        content,
+        content: String(content),
         confidence: 0.85,
-        claims: [],
-        evidenceChain: [],
+        evidenceChain: [] as typeof clinicalReport.sections[0]['evidenceChain'],
+        claims: [] as typeof clinicalReport.sections[0]['claims'],
       }))
     : clinicalReport.sections;
 
@@ -56,15 +55,15 @@ export function ReportViewer({ reportData }: ReportViewerProps) {
         {
           method: 'POST',
           body: JSON.stringify({
-            patient_id: storedResult?.patient_id || selectedPatientId,
+            patient_id: analysisResult?.patient_id || selectedPatientId,
             notes: 'Regenerate with latest model context',
           }),
         }
       ),
     onSuccess: (payload) => {
-      if (payload.report && storedResult) {
+      if (payload.report && analysisResult) {
         setResult({
-          ...storedResult,
+          ...analysisResult,
           report: payload.report,
         });
       }
@@ -81,8 +80,14 @@ export function ReportViewer({ reportData }: ReportViewerProps) {
             <h1 style={{ fontSize: '20px' }} className="text-foreground">Clinical Intelligence Report</h1>
           </div>
           <div className="flex items-center gap-4 mt-1 text-muted-foreground" style={{ fontSize: '12px' }}>
-            <span className="font-mono">{clinicalReport.id}</span>
-            <span>Generated {effectiveReport?.generated_at ? new Date(effectiveReport.generated_at).toLocaleString() : new Date(clinicalReport.generatedAt).toLocaleString()}</span>
+            <span className="font-mono">
+              {analysisResult ? `NS-${analysisResult.patient_id}` : clinicalReport.id}
+            </span>
+            <span>
+              {analysisResult?.report?.generated_at
+                ? new Date(analysisResult.report.generated_at).toLocaleString()
+                : new Date(clinicalReport.generatedAt).toLocaleString()}
+            </span>
             <span className="font-mono">{clinicalReport.model}</span>
           </div>
         </div>

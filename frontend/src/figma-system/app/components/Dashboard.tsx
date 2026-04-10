@@ -5,7 +5,7 @@ import { ConnectomeGraph } from './ConnectomeGraph';
 import { GenomicHeatmap } from './GenomicHeatmap';
 import { BiomarkerStrip } from './BiomarkerStrip';
 import { RiskBadge } from './UncertaintyBadge';
-import { Calendar, MapPin, Stethoscope } from 'lucide-react';
+import { Calendar, MapPin, Stethoscope, Brain, Copy } from 'lucide-react';
 import { PatientInputPanel } from './PatientInputPanel';
 import { useAnalysisStore } from '../../../state/analysisStore';
 import type { AnalysisResult } from '../types/analysis';
@@ -47,6 +47,20 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
     return 'var(--primary)';
   };
 
+  const copyResults = () => {
+    if (!analysisResult) return;
+    const text = [
+      'NeuroSynth Analysis Report',
+      `Patient: ${patient.name} (${patient.mrn})`,
+      `Risk: ${Math.round(analysisResult.probability * 100)}% - ${analysisResult.risk_level}`,
+      `Confidence: ${analysisResult.confidence}`,
+      `Disease: ${analysisResult.disease_classification?.predicted_disease || 'N/A'}`,
+      `Top factors: ${analysisResult.top_risk_factors?.slice(0, 3).join(', ')}`,
+      `Generated: ${new Date().toLocaleString()}`,
+    ].join('\n');
+    void navigator.clipboard.writeText(text);
+  };
+
   return (
     <div className="flex flex-1 overflow-hidden">
       <aside className="w-96 border-r border-border bg-card/40">
@@ -69,16 +83,53 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
               <span className="flex items-center gap-1"><Calendar size={11} /> Admitted {patient.admissionDate}</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className="font-mono text-foreground" style={{ fontSize: '28px', color: `var(--risk-${riskLevel})` }}>
-              {Math.round(probability * 100)}%
-            </div>
-            <div className="text-muted-foreground" style={{ fontSize: '10px' }}>DETERIORATION PROBABILITY</div>
-          </div>
         </div>
 
         {/* Main grid */}
         <div className="space-y-4">
+          <div
+            className="rounded-xl border p-5 mb-4 flex items-center justify-between"
+            style={{
+              borderColor: `var(--risk-${riskLevel})`,
+              background: `var(--risk-${riskLevel}-bg)`,
+            }}
+          >
+            <div>
+              <div className="text-xs font-mono tracking-widest mb-1" style={{ color: `var(--risk-${riskLevel})` }}>
+                DETERIORATION RISK - {riskLevel.toUpperCase()}
+              </div>
+              <div
+                className="font-mono font-bold leading-none"
+                style={{ fontSize: 52, color: `var(--risk-${riskLevel})` }}
+              >
+                {Math.round(probability * 100)}%
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {analysisResult
+                  ? `Confidence: ${analysisResult.confidence} - ${analysisResult.individual_model_probs ? Object.keys(analysisResult.individual_model_probs).length : 4} models in ensemble`
+                  : 'Run analysis to generate risk assessment'}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 items-end">
+              {analysisResult?.top_risk_factors?.slice(0, 3).map((f) => (
+                <span key={f} className="text-xs px-2 py-1 rounded-md font-mono"
+                  style={{ background: 'rgba(0,0,0,0.15)', color: `var(--risk-${riskLevel})` }}>
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {analysisResult && (
+            <button
+              onClick={copyResults}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border hover:border-border-strong"
+            >
+              <Copy size={12} />
+              Copy results
+            </button>
+          )}
+
           {/* Row 1: Forecast */}
           <ForecastChart analysisResult={analysisResult as AnalysisResult | null} />
 
@@ -99,16 +150,16 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
               </span>
             </div>
 
-            <div className="mb-3">
-              <div
-                className="text-lg font-semibold"
-                style={{ color: disease?.predicted_disease ? diseaseColor(disease.predicted_disease) : 'var(--muted-foreground)' }}
-              >
-                {disease?.predicted_disease || 'Run analysis to classify disease type'}
-              </div>
-            </div>
-
             {diseaseRows.length ? (
+              <>
+                <div className="mb-3">
+                  <div
+                    className="text-lg font-semibold"
+                    style={{ color: disease?.predicted_disease ? diseaseColor(disease.predicted_disease) : 'var(--muted-foreground)' }}
+                  >
+                    {disease?.predicted_disease}
+                  </div>
+                </div>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={diseaseRows} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -118,9 +169,16 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
                   <Bar dataKey="probability" radius={[4, 4, 0, 0]} fill="var(--primary)" />
                 </BarChart>
               </ResponsiveContainer>
+              </>
             ) : (
-              <div className="flex h-[220px] items-center justify-center text-xs text-muted-foreground">
-                Disease probabilities will appear after analysis.
+              <div className="flex h-[220px] flex-col items-center justify-center gap-3">
+                <div className="w-12 h-12 rounded-full border-2 border-dashed border-border flex items-center justify-center">
+                  <Brain size={20} className="text-muted-foreground" />
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-medium text-foreground">No disease profile yet</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Run analysis to classify disease type</div>
+                </div>
               </div>
             )}
           </div>

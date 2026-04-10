@@ -74,15 +74,24 @@ export function PerformanceDashboard() {
         </ResponsiveContainer>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="mb-3 text-sm font-medium text-foreground">Confusion Matrix</h2>
-        <div className="grid w-full max-w-md grid-cols-2 gap-2">
-          <CellBox label="TN" value={tn} bg="var(--risk-low-bg)" color="var(--risk-low)" />
-          <CellBox label="FP" value={fp} bg="var(--risk-high-bg)" color="var(--risk-high)" />
-          <CellBox label="FN" value={fn} bg="var(--risk-moderate-bg)" color="var(--risk-moderate)" />
-          <CellBox label="TP" value={tp} bg="var(--risk-critical-bg)" color="var(--risk-critical)" />
+      {perf.data?.confusion_matrix && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h3 className="text-sm font-medium text-foreground mb-4">Confusion Matrix</h3>
+          <div className="grid grid-cols-2 gap-2 max-w-xs">
+            {[
+              { label: 'True Negative', value: tn, color: 'var(--risk-low)' },
+              { label: 'False Positive', value: fp, color: 'var(--risk-critical)' },
+              { label: 'False Negative', value: fn, color: 'var(--risk-high)' },
+              { label: 'True Positive', value: tp, color: 'var(--risk-low)' },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="rounded-lg border border-border p-3 text-center">
+                <div className="font-mono text-2xl font-bold" style={{ color }}>{value ?? '-'}</div>
+                <div className="text-xs text-muted-foreground mt-1">{label}</div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -96,11 +105,3 @@ function MetricCard({ label, value }: { label: string; value: number | undefined
   );
 }
 
-function CellBox({ label, value, bg, color }: { label: string; value: number; bg: string; color: string }) {
-  return (
-    <div className="rounded p-3" style={{ background: bg }}>
-      <div className="text-xs" style={{ color }}>{label}</div>
-      <div className="font-mono text-xl" style={{ color }}>{value}</div>
-    </div>
-  );
-}

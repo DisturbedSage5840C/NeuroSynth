@@ -5,6 +5,7 @@ import { usePatients } from '../hooks/usePatients';
 import { RiskBadge } from './UncertaintyBadge';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../../lib/api';
+import { useAnalysisStore } from '../../../state/analysisStore';
 
 interface PatientSidebarProps {
   selectedId: string;
@@ -15,6 +16,7 @@ type SortKey = 'deteriorationProb' | 'name' | 'lastUpdated';
 
 export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
   const { data: patients = [], isLoading } = usePatients();
+  const analysisResult = useAnalysisStore((s) => s.result);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('deteriorationProb');
@@ -116,6 +118,18 @@ export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
       {/* Patient list */}
       <div className="flex-1 overflow-y-auto">
         {filtered.map(patient => (
+          (() => {
+            const isCurrentlyAnalyzed = analysisResult?.patient_id === patient.id;
+            const displayProb = isCurrentlyAnalyzed
+              ? analysisResult!.probability
+              : patient.deteriorationProb;
+            const displayRisk = isCurrentlyAnalyzed
+              ? (analysisResult!.risk_level.toLowerCase().includes('critical') ? 'critical' :
+                 analysisResult!.risk_level.toLowerCase().includes('high') ? 'high' :
+                 analysisResult!.risk_level.toLowerCase().includes('moderate') ? 'moderate' : 'low')
+              : patient.riskLevel;
+
+            return (
           <button
             key={patient.id}
             onClick={() => onSelect(patient.id)}
@@ -137,14 +151,19 @@ export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
               </div>
             </div>
             <div className="flex items-center justify-between mt-1.5 pl-8">
-              <RiskBadge level={patient.riskLevel} value={`${Math.round(patient.deteriorationProb * 100)}%`} />
+              <RiskBadge level={displayRisk} value={`${Math.round(displayProb * 100)}%`} />
               <span className="text-muted-foreground" style={{ fontSize: '10px' }}>
                 <Activity size={10} className="inline mr-1" />
                 {patient.lastUpdated}
               </span>
             </div>
+            {isCurrentlyAnalyzed && (
+              <div className="text-[10px] text-primary mt-1 pl-8">Last analyzed just now</div>
+            )}
             <div className="text-muted-foreground mt-1 pl-8" style={{ fontSize: '10px' }}>{patient.diagnosis}</div>
           </button>
+            );
+          })()
         ))}
       </div>
 

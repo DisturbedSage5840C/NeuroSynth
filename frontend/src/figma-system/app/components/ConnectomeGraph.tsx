@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { connectomeData } from '../data/mock-data';
+import { Network } from 'lucide-react';
 import type { AnalysisResult } from '../types/analysis';
 
 interface ConnectomeGraphProps {
@@ -12,6 +13,10 @@ export function ConnectomeGraph({ analysisResult }: ConnectomeGraphProps) {
 
   useEffect(() => {
     if (!svgRef.current) return;
+    if (!analysisResult) {
+      d3.select(svgRef.current).selectAll('*').remove();
+      return;
+    }
     const causalEdges = analysisResult?.causal_graph?.edges;
     const fromCausal = Array.isArray(causalEdges) && causalEdges.length > 0;
     const nodes = fromCausal
@@ -113,12 +118,26 @@ export function ConnectomeGraph({ analysisResult }: ConnectomeGraphProps) {
         <h3 className="text-sm font-medium text-foreground">Brain Connectome</h3>
         <span className="text-xs text-muted-foreground">D3 Force Graph · Drag nodes</span>
       </div>
-      <svg ref={svgRef} className="w-full" style={{ height: 320 }} />
-      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-        <span style={{ color: 'var(--risk-low)' }}>● Low activity</span>
-        <span style={{ color: 'var(--risk-high)' }}>● High activity</span>
-        <span>Edge opacity = connectivity strength</span>
-      </div>
+      {!analysisResult ? (
+        <div className="flex h-[320px] flex-col items-center justify-center gap-3">
+          <div className="w-12 h-12 rounded-full border-2 border-dashed border-border flex items-center justify-center">
+            <Network size={20} className="text-muted-foreground" />
+          </div>
+          <div className="text-center">
+            <div className="text-sm font-medium text-foreground">No connectome data yet</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Run analysis to infer brain network patterns</div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <svg ref={svgRef} className="w-full" style={{ height: 320 }} />
+          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+            <span style={{ color: 'var(--risk-low)' }}>● Low activity</span>
+            <span style={{ color: 'var(--risk-high)' }}>● High activity</span>
+            <span>Edge opacity = connectivity strength</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

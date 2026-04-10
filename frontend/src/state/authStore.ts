@@ -20,7 +20,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       refreshToken: refresh,
       role: (role as UserRole) || "researcher",
     }),
-  clear: () => set({ accessToken: null, refreshToken: null, role: null }),
+  clear: () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("ns_logged_in");
+    }
+    set({ accessToken: null, refreshToken: null, role: null });
+  },
 }));
 
 export const authStore = useAuthStore;

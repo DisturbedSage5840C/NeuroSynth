@@ -79,6 +79,7 @@ export function PatientInputPanel({ onResult, patientId }: PatientInputPanelProp
   });
 
   const handleSubmit = () => mutation.mutate(fields);
+  const isBinaryField = (min: number, max: number, step: number) => min === 0 && max === 1 && step === 1;
 
   return (
     <div className="h-full overflow-y-auto p-4">
@@ -94,30 +95,57 @@ export function PatientInputPanel({ onResult, patientId }: PatientInputPanelProp
 
       {SECTIONS.map((section) => (
         <div key={section} className="mb-4 rounded-lg border border-border bg-card p-3">
-          <h3 className="mb-3 font-mono text-primary" style={{ fontSize: "11px", letterSpacing: "0.06em" }}>
-            {section.toUpperCase()}
-          </h3>
+          <div className="mb-3 flex items-center gap-2">
+            <div className="w-0.5 h-4 rounded-full bg-primary" />
+            <h3 className="text-xs font-medium tracking-wider text-primary uppercase">{section}</h3>
+          </div>
           <div className="grid grid-cols-1 gap-3">
-            {PATIENT_FIELDS.filter((f) => f.section === section).map((f) => (
-              <div key={f.key} className="rounded border border-border bg-background p-2">
-                <div className="mb-1 flex justify-between" style={{ fontSize: "11px" }}>
-                  <span className="text-muted-foreground">{f.label}</span>
-                  <span className="font-mono text-foreground">{fields[f.key]}</span>
+            {PATIENT_FIELDS.filter((f) => f.section === section).map((f) =>
+              isBinaryField(f.min, f.max, f.step) ? (
+                <div
+                  key={f.key}
+                  className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 cursor-pointer"
+                  onClick={() => setFields((prev) => ({ ...prev, [f.key]: prev[f.key] ? 0 : 1 }))}
+                >
+                  <span className="text-xs text-muted-foreground">{f.label}</span>
+                  <div
+                    className="w-9 h-5 rounded-full transition-colors flex items-center px-0.5"
+                    style={{
+                      background: fields[f.key] ? 'var(--primary)' : 'var(--secondary)',
+                    }}
+                  >
+                    <div
+                      className="w-4 h-4 rounded-full bg-white shadow-sm transition-transform"
+                      style={{ transform: fields[f.key] ? 'translateX(16px)' : 'translateX(0)' }}
+                    />
+                  </div>
                 </div>
-                <Slider
-                  min={f.min}
-                  max={f.max}
-                  step={f.step}
-                  value={[fields[f.key]]}
-                  onValueChange={(value) =>
-                    setFields((prev) => ({
-                      ...prev,
-                      [f.key]: Number(value[0]),
-                    }))
-                  }
-                />
-              </div>
-            ))}
+              ) : (
+                <div key={f.key} className="rounded-lg border border-border bg-background px-3 py-2">
+                  <div className="flex justify-between items-baseline mb-2">
+                    <span className="text-xs text-muted-foreground">{f.label}</span>
+                    <span
+                      className="font-mono text-xs font-medium px-1.5 py-0.5 rounded"
+                      style={{ background: 'var(--secondary)', color: 'var(--foreground)' }}
+                    >
+                      {fields[f.key]}
+                    </span>
+                  </div>
+                  <Slider
+                    min={f.min}
+                    max={f.max}
+                    step={f.step}
+                    value={[fields[f.key]]}
+                    onValueChange={([v]) => setFields((prev) => ({ ...prev, [f.key]: v }))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[10px] text-muted-foreground">{f.min}</span>
+                    <span className="text-[10px] text-muted-foreground">{f.max}</span>
+                  </div>
+                </div>
+              )
+            )}
           </div>
         </div>
       ))}
