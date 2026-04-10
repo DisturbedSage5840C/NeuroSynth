@@ -15,6 +15,11 @@ Use one URL for the complete integrated app:
 
 - http://localhost:8000
 
+## Deployment Targets
+
+- Local full stack: FastAPI + React static bundle + PostgreSQL + Redis
+- Vercel: frontend-only deployment (requires backend API URL env for live endpoints)
+
 ## System Architecture
 
 ```mermaid
@@ -72,6 +77,35 @@ sequenceDiagram
 
 ## One-Time Setup
 
+### Option A: Docker Compose (recommended for local full stack)
+
+1. Create `.env` from `.env.example` and keep values aligned.
+2. Start dependencies:
+
+```bash
+docker compose up postgres redis -d
+```
+
+3. Start backend:
+
+```bash
+/Users/maruteymani/Documents/NeuroSynth/.venv/bin/python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
+```
+
+4. Build frontend and publish static assets used by backend:
+
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+rm -rf static
+mkdir -p static
+cp -R frontend/dist/* static/
+```
+
+### Option B: Manual local services
+
 1. Install backend packages (including heavy ML runtime dependencies):
 
 ```bash
@@ -121,6 +155,20 @@ NEUROSYNTH_REDIS_URL=redis://localhost:6379/0 \
 /Users/maruteymani/Documents/NeuroSynth/.venv/bin/python -m celery -A backend.celery_app:celery_app worker -l info --concurrency=1
 ```
 
+## Vercel Frontend Deployment
+
+Vercel project names must be lowercase, so use `neurosynth` as the project slug.
+
+```bash
+cd frontend
+npx vercel project add neurosynth
+npx vercel link --yes --scope disturbedsage5840cs-projects --project neurosynth
+```
+
+Set required frontend env vars in Vercel Project Settings (for example `VITE_API_BASE_URL`) so the deployed UI can call your backend.
+
+The repository includes `frontend/vercel.json` with Vite output set to `dist`.
+
 ## Demo Credentials
 
 - `clinician@neurosynth.local` / `neurosynth`
@@ -153,3 +201,4 @@ PGPASSWORD=postgres /opt/homebrew/opt/postgresql@16/bin/psql -h localhost -U pos
 - If DB endpoints return fallback data, confirm `brew services list` shows `postgresql@16` started and re-run schema file.
 - If UI is stale, rebuild frontend and re-copy `frontend/dist` to `static/`.
 - If Docker build fails with daemon errors, start Docker Desktop first.
+- If Vercel deployment returns an `Unexpected error` after upload, inspect build/deploy status in the Vercel dashboard and retry `npx vercel deploy --prod --yes`.
