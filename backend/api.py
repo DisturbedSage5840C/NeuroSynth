@@ -93,7 +93,11 @@ async def lifespan(app: FastAPI):
         if pipeline.df_processed is not None:
             causal_cols = [c for c in causal_model.variables if c in pipeline.df_processed.columns]
             if len(causal_cols) == len(causal_model.variables):
-                causal_model.fit(pipeline.df_processed[causal_model.variables].values.astype(float))
+                causal_model.fit(
+                    pipeline.df_processed[causal_model.variables].values.astype(float),
+                    outer_iters=2,
+                    inner_iters=20,
+                )
 
         reporter = ClinicalReportGenerator()
         metrics = predictor.evaluate(X_test.values, y_test.values)

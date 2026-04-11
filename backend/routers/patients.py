@@ -27,7 +27,22 @@ async def list_patients(
     _ = user
     if db.pool:
         rows = await db.pool.fetch(
-            "SELECT id, name, updated_at FROM patients ORDER BY updated_at DESC LIMIT 50"
+            """
+            SELECT
+                p.id,
+                p.name,
+                COALESCE(a.created_at, p.updated_at) AS updated_at
+            FROM patients p
+            LEFT JOIN LATERAL (
+                SELECT created_at
+                FROM analyses
+                WHERE patient_id = p.id
+                ORDER BY created_at DESC
+                LIMIT 1
+            ) a ON TRUE
+            ORDER BY updated_at DESC
+            LIMIT 50
+            """
         )
         items = [
             PatientSummary(patient_id=str(r["id"]), name=str(r["name"]), updated_at=r["updated_at"])

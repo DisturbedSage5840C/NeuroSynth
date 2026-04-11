@@ -89,7 +89,7 @@ docker compose up postgres redis -d
 3. Start backend:
 
 ```bash
-/Users/maruteymani/Documents/NeuroSynth/.venv/bin/python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
+python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
 ```
 
 4. Build frontend and publish static assets used by backend:
@@ -109,8 +109,8 @@ cp -R frontend/dist/* static/
 1. Install backend packages (including heavy ML runtime dependencies):
 
 ```bash
-/Users/maruteymani/Documents/NeuroSynth/.venv/bin/pip install -e '.[test]'
-/Users/maruteymani/Documents/NeuroSynth/.venv/bin/pip install torch requests
+pip install -e '.[test]'
+pip install torch requests
 ```
 
 2. Build frontend and publish static assets for backend hosting:
@@ -145,14 +145,14 @@ redis-server --port 6379
 ```bash
 NEUROSYNTH_POSTGRES_DSN=postgresql://postgres:postgres@localhost:5432/neurosynth \
 NEUROSYNTH_REDIS_URL=redis://localhost:6379/0 \
-/Users/maruteymani/Documents/NeuroSynth/.venv/bin/python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
+python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
 ```
 
 6. Optional: Start Celery worker:
 
 ```bash
 NEUROSYNTH_REDIS_URL=redis://localhost:6379/0 \
-/Users/maruteymani/Documents/NeuroSynth/.venv/bin/python -m celery -A backend.celery_app:celery_app worker -l info --concurrency=1
+python -m celery -A backend.celery_app:celery_app worker -l info --concurrency=1
 ```
 
 ## Vercel Frontend Deployment
@@ -192,7 +192,7 @@ PGPASSWORD=postgres /opt/homebrew/opt/postgresql@16/bin/psql -h localhost -U pos
 ```
 
 ```bash
-/Users/maruteymani/Documents/NeuroSynth/.venv/bin/python -m pytest -q /Users/maruteymani/Documents/NeuroSynth/tests/integration/test_pipeline_and_tasks_qa.py
+python -m pytest -q tests/integration/test_pipeline_and_tasks_qa.py
 ```
 
 ## Troubleshooting

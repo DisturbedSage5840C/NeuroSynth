@@ -28,6 +28,25 @@ services:
       timeout: 3s
       retries: 5
 
+  celery-worker:
+    build: .
+    command: >
+      celery -A backend.celery_app:celery_app worker
+      --loglevel=info --concurrency=1
+    env_file:
+      - .env
+    environment:
+      - NEUROSYNTH_POSTGRES_DSN=postgresql://postgres:postgres@postgres:5432/neurosynth
+      - NEUROSYNTH_REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./neurological_disease_data.csv:/app/neurological_disease_data.csv
+      - ./models:/app/models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   neurosynth:
     build: .
     ports:
@@ -38,7 +57,7 @@ services:
       - NEUROSYNTH_POSTGRES_DSN=postgresql://postgres:postgres@postgres:5432/neurosynth
       - NEUROSYNTH_REDIS_URL=redis://redis:6379/0
     volumes:
-      - ./alzheimers_disease_data.csv:/app/alzheimers_disease_data.csv
+      - ./neurological_disease_data.csv:/app/neurological_disease_data.csv
       - ./models:/app/models
     depends_on:
       postgres:

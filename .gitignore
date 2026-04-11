@@ -22,3 +22,5 @@ artifacts/
 mlruns/
 dump.rdb
 static/
+.vercel
+.env*.local
