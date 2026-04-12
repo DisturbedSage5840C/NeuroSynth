@@ -10,6 +10,14 @@ export interface AuthState {
   clear: () => void;
 }
 
+function normalizeRole(role: string): UserRole {
+  const normalized = role.trim().toLowerCase();
+  if (normalized === "admin") return "admin";
+  if (normalized === "researcher") return "researcher";
+  if (normalized === "clinician") return "clinician";
+  return "researcher";
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   refreshToken: null,
@@ -18,7 +26,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       accessToken: access,
       refreshToken: refresh,
-      role: (role as UserRole) || "researcher",
+      role: normalizeRole(role),
     }),
   clear: () => {
     if (typeof window !== "undefined") {

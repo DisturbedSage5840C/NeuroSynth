@@ -8,10 +8,10 @@ import { useAuthStore } from '../../../state/authStore';
 import { useAnalysisStore } from '../../../state/analysisStore';
 
 const navItems = [
-  { to: '/', icon: <LayoutDashboard size={16} />, label: 'Dashboard' },
-  { to: '/report', icon: <FileText size={16} />, label: 'Report' },
-  { to: '/explorer', icon: <Database size={16} />, label: 'Explorer' },
-  { to: '/performance', icon: <BarChart2 size={16} />, label: 'Performance' },
+  { to: '/app', icon: <LayoutDashboard size={16} />, label: 'Dashboard' },
+  { to: '/app/report', icon: <FileText size={16} />, label: 'Report' },
+  { to: '/app/explorer', icon: <Database size={16} />, label: 'Explorer' },
+  { to: '/app/performance', icon: <BarChart2 size={16} />, label: 'Performance' },
 ];
 
 export function Layout() {
@@ -62,7 +62,7 @@ export function Layout() {
               }`
             }
             title={item.label}
-            end={item.to === '/'}
+            end={item.to === '/app'}
           >
             <span className="flex items-center gap-3 w-full">
               {item.icon}

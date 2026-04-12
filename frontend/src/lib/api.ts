@@ -5,8 +5,24 @@ const IS_BROWSER = typeof window !== "undefined";
 const IS_HOSTED = IS_BROWSER && !["localhost", "127.0.0.1"].includes(window.location.hostname);
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true" || (IS_HOSTED && !import.meta.env.VITE_API_BASE_URL);
 
+type DemoRole = "CLINICIAN" | "RESEARCHER" | "ADMIN";
+type DemoUser = { username: string; password: string; role: DemoRole };
+
+const DEMO_USERS: DemoUser[] = [
+  { username: "clinician@neurosynth.local", password: "neurosynth", role: "CLINICIAN" },
+  { username: "researcher@neurosynth.local", password: "neurosynth", role: "RESEARCHER" },
+  { username: "admin@neurosynth.local", password: "neurosynth", role: "ADMIN" },
+];
+
 export interface ApiError extends Error {
   status?: number;
+}
+
+function normalizeRequestedRole(role: string): DemoRole {
+  const normalized = role.trim().toUpperCase();
+  if (normalized === "ADMIN") return "ADMIN";
+  if (normalized === "RESEARCHER") return "RESEARCHER";
+  return "CLINICIAN";
 }
 
 type DemoPatient = { patient_id: string; name: string; updated_at: string };
@@ -312,10 +328,20 @@ export async function login(
   role: string = "CLINICIAN"
 ): Promise<{ access_token: string; refresh_token: string; role: string; }> {
   if (DEMO_MODE) {
+    const requestedRole = normalizeRequestedRole(role);
+    const account = DEMO_USERS.find(
+      (user) => user.username === username.trim().toLowerCase() && user.password === password
+    );
+    if (!account) {
+      throw new Error("Invalid username or password");
+    }
+    if (account.role !== requestedRole) {
+      throw new Error(`Role mismatch: this account is ${account.role.toLowerCase()}`);
+    }
     return {
       access_token: "demo-access",
       refresh_token: "demo-refresh",
-      role,
+      role: account.role,
     };
   }
   const response = await fetch(`${API_BASE_URL}/auth/login`, {

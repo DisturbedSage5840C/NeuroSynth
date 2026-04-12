@@ -6,6 +6,7 @@ import { ReportViewer } from './components/ReportViewer';
 import { DataExplorer } from './components/DataExplorer';
 import { PerformanceDashboard } from './components/PerformanceDashboard';
 import { LoginPage } from '../../features/auth/LoginPage';
+import { LandingPage } from '../../features/auth/LandingPage';
 import { useOutletContext } from 'react-router';
 import { useAuthStore } from '../../state/authStore';
 
@@ -22,9 +23,10 @@ function DashboardPage() {
 }
 
 export const router = createBrowserRouter([
+  { path: '/', Component: LandingPage },
   { path: '/login', Component: LoginPage },
   {
-    path: '/',
+    path: '/app',
     element: (
       <RequireAuth>
         <Layout />
