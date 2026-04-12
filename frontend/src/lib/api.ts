@@ -156,13 +156,22 @@ function makeDemoAnalysis(patientId: string, features: Record<string, number>) {
 async function demoFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const method = (init.method || "GET").toUpperCase();
 
-  if (path === "/patients" && method === "GET") {
+  if ((path === "/patients" || path === "/patients/") && method === "GET") {
     return { items: getDemoPatients() } as T;
   }
 
-  if (path.startsWith("/patients/?") && method === "POST") {
+  if ((path === "/patients" || path === "/patients/" || path.startsWith("/patients/?")) && method === "POST") {
     const url = new URL(path, "https://demo.local");
-    const name = url.searchParams.get("name") || `New Patient ${String(Date.now()).slice(-4)}`;
+    let name = url.searchParams.get("name") || "";
+    if (!name && typeof init.body === "string") {
+      try {
+        const payload = JSON.parse(init.body) as { name?: string };
+        name = typeof payload.name === "string" ? payload.name : "";
+      } catch {
+        name = "";
+      }
+    }
+    name = name || `New Patient ${String(Date.now()).slice(-4)}`;
     const patient_id = `P-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const updated_at = new Date().toISOString();
     const patients = [{ patient_id, name, updated_at }, ...getDemoPatients()];
