@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Brain, Loader2 } from "lucide-react";
 
 import { apiFetch } from "../../../lib/api";
@@ -49,25 +50,37 @@ interface PatientInputPanelProps {
 }
 
 export function PatientInputPanel({ onResult, patientId }: PatientInputPanelProps) {
+  const queryClient = useQueryClient();
   const defaults = useMemo(
     () => Object.fromEntries(PATIENT_FIELDS.map((f) => [f.key, f.default])) as Record<string, number>,
     []
   );
+  const [patientName, setPatientName] = useState("");
   const [fields, setFields] = useState<Record<string, number>>(defaults);
   const [error, setError] = useState("");
 
   const mutation = useMutation({
-    mutationFn: (features: Record<string, number>) =>
-      apiFetch<AnalysisResult>("/predictions/analyze", {
+    mutationFn: async (features: Record<string, number>) => {
+      const create = await apiFetch<{ patient_id: string }>("/patients/", {
         method: "POST",
         body: JSON.stringify({
-          patient_id: patientId,
+          name: patientName.trim() || `Patient ${String(Date.now()).slice(-4)}`,
+        }),
+      });
+
+      return apiFetch<AnalysisResult>("/predictions/analyze", {
+        method: "POST",
+        body: JSON.stringify({
+          patient_id: create.patient_id || patientId,
           features,
         }),
-      }),
-    onSuccess: (data) => {
+      });
+    },
+    onSuccess: async (data) => {
       setError("");
+      await queryClient.invalidateQueries({ queryKey: ["patients"] });
       onResult(data);
+      setPatientName("");
     },
     onError: (err: unknown) => {
       if (err instanceof Error) {
@@ -92,6 +105,17 @@ export function PatientInputPanel({ onResult, patientId }: PatientInputPanelProp
       >
         New Analysis
       </button>
+
+      <div className="mb-4 rounded-lg border border-border bg-card p-3">
+        <div className="mb-2 text-xs font-medium tracking-wider text-primary uppercase">Patient Identity</div>
+        <input
+          type="text"
+          placeholder="Enter patient name"
+          value={patientName}
+          onChange={(e) => setPatientName(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground"
+        />
+      </div>
 
       {SECTIONS.map((section) => (
         <div key={section} className="mb-4 rounded-lg border border-border bg-card p-3">

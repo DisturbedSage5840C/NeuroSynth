@@ -26,6 +26,7 @@ async def health() -> HealthResponse:
 async def ready(request: Request, db: Database = Depends(get_database)) -> ReadyResponse:
     db_ok = False
     redis_ok = False
+    models_loaded = bool(getattr(request.app.state, "predictor", None))
     redis_client = getattr(request.app.state, "redis", None)
 
     try:
@@ -39,4 +40,10 @@ async def ready(request: Request, db: Database = Depends(get_database)) -> Ready
     except Exception:
         redis_ok = False
 
-    return ReadyResponse(status="ready" if db_ok and redis_ok else "degraded", database=db_ok, redis=redis_ok)
+    is_ready = db_ok and redis_ok and models_loaded
+    return ReadyResponse(
+        status="ready" if is_ready else "degraded",
+        database=db_ok,
+        redis=redis_ok,
+        models_loaded=models_loaded,
+    )

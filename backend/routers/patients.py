@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
 from uuid import uuid4
+from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Body, Depends, Request
 
 from backend.core.rate_limit import limiter, role_limit
 from backend.db import Database
@@ -31,10 +32,13 @@ async def list_patients(
             SELECT
                 p.id,
                 p.name,
+                a.probability,
+                a.risk_level,
+                a.disease_classification,
                 COALESCE(a.created_at, p.updated_at) AS updated_at
             FROM patients p
             LEFT JOIN LATERAL (
-                SELECT created_at
+                SELECT probability, risk_level, disease_classification, created_at
                 FROM analyses
                 WHERE patient_id = p.id
                 ORDER BY created_at DESC
@@ -45,7 +49,14 @@ async def list_patients(
             """
         )
         items = [
-            PatientSummary(patient_id=str(r["id"]), name=str(r["name"]), updated_at=r["updated_at"])
+            PatientSummary(
+                patient_id=str(r["id"]),
+                name=str(r["name"]),
+                probability=float(r["probability"]) if r["probability"] is not None else None,
+                risk_level=str(r["risk_level"]) if r["risk_level"] is not None else None,
+                disease_classification=dict(r["disease_classification"]) if r["disease_classification"] is not None else None,
+                updated_at=r["updated_at"],
+            )
             for r in rows
         ]
     else:
@@ -80,16 +91,30 @@ async def get_patient(patient_id: str, request: Request, user: UserContext = Dep
 )
 @limiter.limit(role_limit)
 async def create_patient(
-    name: str,
-    age: int,
-    sex: str,
-    diagnosis: str,
     request: Request,
+    name: str | None = None,
+    age: int = 62,
+    sex: str = "F",
+    diagnosis: str = "Neurology Monitoring",
+    payload: dict[str, Any] | None = Body(default=None),
     user: UserContext = Depends(get_current_user),
     db: Database = Depends(get_database),
 ) -> PatientSummary:
     _ = request
     _ = user
+    if payload:
+        if payload.get("name"):
+            name = str(payload["name"])
+        if payload.get("age") is not None:
+            age = int(payload["age"])
+        if payload.get("sex") is not None:
+            sex = str(payload["sex"])
+        if payload.get("diagnosis") is not None:
+            diagnosis = str(payload["diagnosis"])
+
+    if not name:
+        name = f"New Patient {uuid4().hex[:4].upper()}"
+
     patient_id = f"P-{uuid4().hex[:6].upper()}"
     mrn = f"SYN-{uuid4().hex[:5].upper()}"
     now = datetime.now(tz=UTC)

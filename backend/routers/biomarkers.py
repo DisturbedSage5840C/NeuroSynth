@@ -9,6 +9,7 @@ from backend.core.metrics import ACTIVE_SSE_CONNECTIONS
 from backend.core.rate_limit import limiter, role_limit
 from backend.deps import get_current_user, get_redis
 from backend.models import SSEHandshakeResponse, UserContext
+from backend.wearable_simulator import WearableSimulator
 
 router = APIRouter(prefix="/biomarkers", tags=["biomarkers"])
 
@@ -61,5 +62,34 @@ async def biomarkers_stream(
             ACTIVE_SSE_CONNECTIONS.dec()
             await pubsub.unsubscribe("biomarkers.progress")
             await pubsub.close()
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get(
+    "/live/{patient_id}",
+    response_class=StreamingResponse,
+    summary="Wearable live stream",
+    description="Server-Sent Events stream for simulated wearable vitals generated with AR(1) autocorrelation.",
+)
+@limiter.limit(role_limit)
+async def live_biomarkers(
+    patient_id: str,
+    request: Request,
+    user: UserContext = Depends(get_current_user),
+):
+    _ = request
+    _ = user
+    simulator = WearableSimulator(seed=abs(hash(patient_id)) % (2**32))
+
+    async def event_generator() -> asyncio.AsyncGenerator[str, None]:
+        ACTIVE_SSE_CONNECTIONS.inc()
+        try:
+            while True:
+                payload = simulator.next_reading(patient_id=patient_id)
+                yield f"event: vitals\ndata: {json.dumps(payload)}\n\n"
+                await asyncio.sleep(2.0)
+        finally:
+            ACTIVE_SSE_CONNECTIONS.dec()
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

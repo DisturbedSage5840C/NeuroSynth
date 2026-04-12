@@ -8,12 +8,73 @@ import numpy as np
 import torch
 from torch import nn
 
+DEFAULT_VARIABLES = [
+    "Age",
+    "MMSE",
+    "FunctionalAssessment",
+    "ADL",
+    "MemoryComplaints",
+    "BehavioralProblems",
+    "Depression",
+    "SleepQuality",
+    "PhysicalActivity",
+    "Diagnosis",
+]
+
+DISEASE_VARIABLES = {
+    "Alzheimer's Disease": DEFAULT_VARIABLES,
+    "Parkinson's Disease": [
+        "Age",
+        "MMSE",
+        "FunctionalAssessment",
+        "ADL",
+        "Depression",
+        "SleepQuality",
+        "PhysicalActivity",
+        "Diagnosis",
+    ],
+    "Multiple Sclerosis": [
+        "Age",
+        "FunctionalAssessment",
+        "ADL",
+        "Depression",
+        "SleepQuality",
+        "PhysicalActivity",
+        "Diagnosis",
+    ],
+    "Epilepsy": [
+        "Age",
+        "MMSE",
+        "SleepQuality",
+        "Depression",
+        "PhysicalActivity",
+        "Diagnosis",
+    ],
+    "ALS": [
+        "Age",
+        "FunctionalAssessment",
+        "ADL",
+        "PhysicalActivity",
+        "Depression",
+        "Diagnosis",
+    ],
+    "Huntington's Disease": [
+        "Age",
+        "MMSE",
+        "FunctionalAssessment",
+        "ADL",
+        "MemoryComplaints",
+        "Depression",
+        "Diagnosis",
+    ],
+}
+
 
 class _NodeMLP(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, input_dim: int) -> None:
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(10, 64),
+            nn.Linear(input_dim, 64),
             nn.GELU(),
             nn.Linear(64, 32),
             nn.GELU(),
@@ -25,33 +86,22 @@ class _NodeMLP(nn.Module):
 
 
 class NeuralCausalDiscovery(nn.Module):
-    variables = [
-        "Age",
-        "MMSE",
-        "FunctionalAssessment",
-        "ADL",
-        "MemoryComplaints",
-        "BehavioralProblems",
-        "Depression",
-        "SleepQuality",
-        "PhysicalActivity",
-        "Diagnosis",
-    ]
-
-    def __init__(self, models_dir: str | Path = "models") -> None:
+    def __init__(self, models_dir: str | Path = "models", variables: list[str] | None = None) -> None:
         super().__init__()
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(parents=True, exist_ok=True)
+        self.variables = list(variables) if variables else list(DEFAULT_VARIABLES)
+        self.n_vars = len(self.variables)
 
-        self.W_logits = nn.Parameter(torch.zeros(10, 10))
-        self.mlps = nn.ModuleList([_NodeMLP() for _ in range(10)])
+        self.W_logits = nn.Parameter(torch.zeros(self.n_vars, self.n_vars))
+        self.mlps = nn.ModuleList([_NodeMLP(self.n_vars) for _ in range(self.n_vars)])
         self.latest_W: np.ndarray | None = None
         self.min_vals: np.ndarray | None = None
         self.max_vals: np.ndarray | None = None
 
     def get_adjacency(self) -> torch.Tensor:
         W = torch.sigmoid(self.W_logits)
-        W = W * (1 - torch.eye(10, device=W.device))
+        W = W * (1 - torch.eye(self.n_vars, device=W.device))
 
         flat = W.flatten()
         k = max(1, int(flat.numel() * 0.3))
@@ -61,12 +111,12 @@ class NeuralCausalDiscovery(nn.Module):
 
     @staticmethod
     def acyclicity_constraint(W: torch.Tensor) -> torch.Tensor:
-        return torch.trace(torch.matrix_exp(W * W)) - 10
+        return torch.trace(torch.matrix_exp(W * W)) - W.shape[0]
 
     def forward(self, X: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         W = self.get_adjacency()
         outs = []
-        for j in range(10):
+        for j in range(self.n_vars):
             xj = X * W[:, j]
             outs.append(self.mlps[j](xj))
         X_hat = torch.cat(outs, dim=1)
@@ -114,7 +164,7 @@ class NeuralCausalDiscovery(nn.Module):
             if graph_file.exists():
                 self.latest_W = np.load(graph_file)
             else:
-                self.latest_W = np.zeros((10, 10), dtype=float)
+                self.latest_W = np.zeros((self.n_vars, self.n_vars), dtype=float)
 
     def get_causal_graph(self) -> dict[str, Any]:
         self._load_if_needed()
@@ -191,7 +241,7 @@ class NeuralCausalDiscovery(nn.Module):
             raise ValueError(f"Unknown variable: {variable}")
 
         idx_map = {v: i for i, v in enumerate(self.variables)}
-        x = np.zeros(10, dtype=float)
+        x = np.zeros(self.n_vars, dtype=float)
         for v in self.variables:
             if v == "Diagnosis":
                 x[idx_map[v]] = 0.0
@@ -199,8 +249,8 @@ class NeuralCausalDiscovery(nn.Module):
                 x[idx_map[v]] = float(patient_data.get(v, 0.0))
 
         if self.min_vals is None or self.max_vals is None:
-            self.min_vals = np.zeros(10)
-            self.max_vals = np.ones(10)
+            self.min_vals = np.zeros(self.n_vars)
+            self.max_vals = np.ones(self.n_vars)
 
         denom = np.where((self.max_vals - self.min_vals) == 0, 1.0, self.max_vals - self.min_vals)
         x_norm = (x - self.min_vals) / denom

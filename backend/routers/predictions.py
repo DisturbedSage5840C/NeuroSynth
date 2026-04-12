@@ -68,6 +68,7 @@ async def analyze_patient(
     causal_model = getattr(request.app.state, "causal", None)
     reporter = getattr(request.app.state, "reporter", None)
     disease_clf = getattr(request.app.state, "disease_classifier", None)
+    multi_predictor = getattr(request.app.state, "multi_predictor", None)
     scaler = getattr(request.app.state, "scaler", None)
     feature_names = getattr(request.app.state, "feature_names", None)
 
@@ -150,7 +151,20 @@ async def analyze_patient(
     frame = pd.DataFrame([{k: float(payload.features.get(k, 0.0)) for k in feature_names}])
     scaled = scaler.transform(frame)
 
+    disease_result = disease_clf.predict_disease(payload.features) if disease_clf else {}
+    primary_disease = disease_result.get("predicted_disease")
+
+    disease_risk_vector: dict[str, float] = {}
     pred = predictor.predict(scaled)
+    if multi_predictor is not None:
+        try:
+            disease_risk_vector = {
+                k: round(float(v), 4) for k, v in multi_predictor.predict_all(scaled).items()
+            }
+            if primary_disease and primary_disease in multi_predictor.predictors:
+                pred = multi_predictor.predict_for_disease(primary_disease, scaled)
+        except Exception:
+            disease_risk_vector = {}
 
     shap_vals = predictor.get_shap_values(scaled[:1])[0]
     top_idx = list(abs(shap_vals).argsort()[::-1][:10])
@@ -173,8 +187,6 @@ async def analyze_patient(
         causal_graph=causal_graph,
         shap_values=shap_top,
     ) if reporter else {"sections": {}, "raw_text": ""}
-
-    disease_result = disease_clf.predict_disease(payload.features) if disease_clf else {}
 
     if db.pool:
         await db.pool.execute(
@@ -217,6 +229,8 @@ async def analyze_patient(
         "causal_graph": causal_graph,
         "report": report,
         "disease_classification": disease_result,
+        "disease_risk_vector": disease_risk_vector,
+        "primary_model_disease": primary_disease,
     }
 
 

@@ -69,6 +69,9 @@ class PatientSummary(BaseModel):
     patient_id: str
     name: str
     updated_at: datetime
+    probability: float | None = None
+    risk_level: str | None = None
+    disease_classification: dict[str, Any] | None = None
 
 
 class PatientListResponse(BaseModel):
@@ -196,11 +199,12 @@ class HealthResponse(BaseModel):
 
 class ReadyResponse(BaseModel):
     model_config = ConfigDict(
-        json_schema_extra={"example": {"status": "ready", "database": True, "redis": True}}
+        json_schema_extra={"example": {"status": "ready", "database": True, "redis": True, "models_loaded": True}}
     )
     status: str
     database: bool
     redis: bool
+    models_loaded: bool
 
 
 class QueueDepthResponse(BaseModel):

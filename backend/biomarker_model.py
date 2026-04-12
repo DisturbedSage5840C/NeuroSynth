@@ -74,6 +74,25 @@ class BiomarkerPredictor:
         self.tree_explainer: Any | None = None
         self.decision_threshold: float = 0.5
 
+    def load_from_disk(self) -> None:
+        self.rf = joblib.load(self.models_dir / "rf_model.pkl")
+        self.gb = joblib.load(self.models_dir / "gb_model.pkl")
+        xgb_path = self.models_dir / "xgboost_model.pkl"
+        if xgb_path.exists():
+            self.third = joblib.load(xgb_path)
+            self.third_name = "xgboost"
+        else:
+            self.third = joblib.load(self.models_dir / "extra_trees_model.pkl")
+            self.third_name = "extra_trees"
+
+        lr_path = self.models_dir / "lr_model.pkl"
+        if lr_path.exists():
+            self.lr = joblib.load(lr_path)
+
+        threshold_path = self.models_dir / "decision_threshold.pkl"
+        if threshold_path.exists():
+            self.decision_threshold = float(joblib.load(threshold_path))
+
     @staticmethod
     def _risk_level(prob: float) -> str:
         if prob >= 0.8:
@@ -118,6 +137,7 @@ class BiomarkerPredictor:
         joblib.dump(self.gb, self.models_dir / "gb_model.pkl")
         joblib.dump(self.third, self.models_dir / f"{self.third_name}_model.pkl")
         joblib.dump(self.lr, self.models_dir / "lr_model.pkl")
+        joblib.dump(self.decision_threshold, self.models_dir / "decision_threshold.pkl")
 
     def _ensemble_probs(self, X: np.ndarray) -> tuple[np.ndarray, dict[str, np.ndarray]]:
         rf_p = self.rf.predict_proba(X)[:, 1]
@@ -206,3 +226,56 @@ class BiomarkerPredictor:
             "classification_report": classification_report(y_test, y_pred, output_dict=True, zero_division=0),
             "decision_threshold": round(float(self.decision_threshold), 4),
         }
+
+
+class MultiDiseasePredictor:
+    def __init__(self, feature_names: list[str], diseases: list[str], models_dir: str | Path = "models/multi") -> None:
+        self.feature_names = feature_names
+        self.diseases = diseases
+        self.models_dir = Path(models_dir)
+        self.models_dir.mkdir(parents=True, exist_ok=True)
+        self.predictors: dict[str, BiomarkerPredictor] = {}
+
+        for disease in diseases:
+            disease_dir = self.models_dir / self._slug(disease)
+            disease_dir.mkdir(parents=True, exist_ok=True)
+            self.predictors[disease] = BiomarkerPredictor(feature_names=feature_names, models_dir=disease_dir)
+
+    @staticmethod
+    def _slug(name: str) -> str:
+        return (
+            name.lower()
+            .replace("'", "")
+            .replace(" ", "_")
+            .replace("-", "_")
+        )
+
+    def train_all(self, splits: dict[str, tuple[Any, Any, Any, Any]]) -> None:
+        for disease, predictor in self.predictors.items():
+            if disease not in splits:
+                continue
+            X_train, _X_test, y_train, _y_test = splits[disease]
+            predictor.train(X_train.values, y_train.values)
+
+    def load_from_disk(self) -> None:
+        loaded: dict[str, BiomarkerPredictor] = {}
+        for disease, predictor in self.predictors.items():
+            try:
+                predictor.load_from_disk()
+                loaded[disease] = predictor
+            except Exception:
+                continue
+        self.predictors = loaded
+
+    def predict_for_disease(self, disease: str, X: np.ndarray) -> dict[str, Any]:
+        predictor = self.predictors.get(disease)
+        if predictor is None:
+            raise KeyError(f"Unknown disease model: {disease}")
+        return predictor.predict(X)
+
+    def predict_all(self, X: np.ndarray) -> dict[str, float]:
+        risk: dict[str, float] = {}
+        for disease, predictor in self.predictors.items():
+            pred = predictor.predict(X)
+            risk[disease] = float(pred["probability"])
+        return risk

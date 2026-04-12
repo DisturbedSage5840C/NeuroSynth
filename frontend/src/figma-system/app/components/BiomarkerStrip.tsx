@@ -6,19 +6,36 @@ import { biomarkerHistory } from '../data/mock-data';
 
 const MAX_POINTS = 60;
 
-export function BiomarkerStrip() {
+interface BiomarkerStripProps {
+  patientId?: string;
+}
+
+export function BiomarkerStrip({ patientId = 'P-001' }: BiomarkerStripProps) {
   const [readings, setReadings] = useState<BiomarkerReading[]>(biomarkerHistory.slice(-20));
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    try {
-      const es = new EventSource(streamUrl('/biomarkers/stream'));
+    const subscribe = (url: string) => {
+      const es = new EventSource(url);
       esRef.current = es;
       es.onmessage = (event) => {
         const data: BiomarkerReading = JSON.parse(event.data);
         setReadings((prev) => [...prev.slice(-MAX_POINTS + 1), data]);
       };
-      es.onerror = () => es.close();
+      return es;
+    };
+
+    try {
+      const primary = subscribe(streamUrl(`/biomarkers/live/${patientId}`));
+      primary.onerror = () => {
+        primary.close();
+        try {
+          const fallback = subscribe(streamUrl('/biomarkers/stream'));
+          fallback.onerror = () => fallback.close();
+        } catch {
+          primary.close();
+        }
+      };
     } catch {
       let i = 0;
       const interval = setInterval(() => {
@@ -35,7 +52,7 @@ export function BiomarkerStrip() {
       return () => clearInterval(interval);
     }
     return () => esRef.current?.close();
-  }, []);
+  }, [patientId]);
 
   const vitals = [
     { key: 'heartRate', label: 'HR', unit: 'bpm', color: 'var(--risk-critical)', normal: [60, 100] },

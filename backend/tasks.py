@@ -13,6 +13,7 @@ from redis import Redis
 from backend.celery_app import celery_app
 from backend.core.config import get_settings
 from backend.core.metrics import ML_INFERENCE_DURATION
+from backend.model_registry import ModelRegistry
 from backend.core.security import hash_patient_id
 
 
@@ -32,17 +33,15 @@ def _publish_progress(task_id: str, phase: str, progress: int, patient_id: str |
     redis_client.publish("biomarkers.progress", json.dumps(payload))
 
 
-def _get_app_state():
+def _get_registry_state():
     try:
-        from backend.api import app
-
-        return app.state
+        return ModelRegistry().load_all()
     except Exception:
         return SimpleNamespace()
 
 
 def _default_patient_features() -> dict[str, float]:
-    state = _get_app_state()
+    state = _get_registry_state()
     feature_names = list(getattr(state, "feature_names", []) or [])
     if not feature_names:
         return {}
@@ -70,7 +69,7 @@ def connectome_inference(self, patient_id: str) -> dict[str, object]:
     started = datetime.now(tz=UTC)
     _publish_progress(self.request.id, phase, 0, patient_id)
     try:
-        state = _get_app_state()
+        state = _get_registry_state()
         predictor = getattr(state, "predictor", None)
         feature_importance = predictor.get_feature_importance() if predictor is not None else {}
         _publish_progress(self.request.id, phase, 100, patient_id)
@@ -90,7 +89,7 @@ def genomic_risk_score(self, patient_id: str) -> dict[str, object]:
     started = datetime.now(tz=UTC)
     _publish_progress(self.request.id, phase, 0, patient_id)
     try:
-        state = _get_app_state()
+        state = _get_registry_state()
         predictor = getattr(state, "predictor", None)
         scaler = getattr(state, "scaler", None)
         feature_names = list(getattr(state, "feature_names", []) or [])
@@ -124,7 +123,7 @@ def temporal_forecast(self, patient_id: str) -> dict[str, object]:
     started = datetime.now(tz=UTC)
     _publish_progress(self.request.id, phase, 0, patient_id)
     try:
-        state = _get_app_state()
+        state = _get_registry_state()
         predictor = getattr(state, "predictor", None)
         temporal = getattr(state, "temporal", None)
         scaler = getattr(state, "scaler", None)
@@ -166,7 +165,7 @@ def causal_analysis(self, patient_id: str) -> dict[str, object]:
     started = datetime.now(tz=UTC)
     _publish_progress(self.request.id, phase, 0, patient_id)
     try:
-        state = _get_app_state()
+        state = _get_registry_state()
         causal_model = getattr(state, "causal", None)
         graph = causal_model.get_causal_graph() if causal_model is not None else {}
         _publish_progress(self.request.id, phase, 100, patient_id)
@@ -187,7 +186,7 @@ def report_generation(self, patient_id: str, notes: str | None = None) -> dict[s
     _publish_progress(self.request.id, phase, 0, patient_id)
     try:
         _ = notes
-        state = _get_app_state()
+        state = _get_registry_state()
         predictor = getattr(state, "predictor", None)
         temporal = getattr(state, "temporal", None)
         causal_model = getattr(state, "causal", None)

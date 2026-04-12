@@ -92,14 +92,6 @@ class DataPipeline:
         if self.target_column not in df.columns:
             raise ValueError("Diagnosis target column is missing from dataset")
 
-        # If expanded multi-disease data is present, keep diagnosis-risk training aligned
-        # with the Alzheimer's clinical target used by the risk model.
-        if "DiseaseType" in df.columns:
-            ad_mask = df["DiseaseType"].astype(str).str.strip().str.lower().eq("alzheimer's disease")
-            ad_df = df[ad_mask].copy()
-            if len(ad_df) >= 500:
-                df = ad_df
-
         df = self._encode_categoricals(df)
 
         numeric_cols = df.columns.tolist()
@@ -139,8 +131,83 @@ class DataPipeline:
         self.df_processed = df
         self.dataset_stats = self._build_dataset_stats(df, feature_names)
         self.dataset_stats["source_n_patients"] = source_rows
-        self.dataset_stats["training_cohort"] = "alzheimers_only" if source_rows != len(df) else "full_dataset"
+        self.dataset_stats["training_cohort"] = "full_dataset"
 
         joblib.dump(scaler, self.models_dir / "scaler.pkl")
 
         return X_train, X_test, y_train, y_test, feature_names, scaler, self.dataset_stats
+
+    def split_by_disease(
+        self,
+        test_size: float = 0.2,
+        random_state: int = 42,
+    ) -> dict[str, tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]]:
+        if self.df_raw is None or self.scaler is None or not self.feature_names:
+            self.process(test_size=test_size, random_state=random_state)
+
+        assert self.df_raw is not None
+        assert self.scaler is not None
+
+        if "DiseaseType" not in self.df_raw.columns:
+            return {}
+
+        splits: dict[str, tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]] = {}
+
+        for disease_name, raw_subset in self.df_raw.groupby("DiseaseType"):
+            df = raw_subset.copy()
+            for col in self.drop_columns:
+                if col in df.columns:
+                    df = df.drop(columns=[col])
+
+            if self.target_column not in df.columns:
+                continue
+
+            df = self._encode_categoricals(df)
+
+            for col in df.columns:
+                if col == self.target_column:
+                    continue
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+                median_val = df[col].median()
+                if pd.isna(median_val):
+                    median_val = 0.0
+                df[col] = df[col].fillna(median_val)
+
+            df[self.target_column] = pd.to_numeric(df[self.target_column], errors="coerce").fillna(0).astype(int)
+
+            if "DiseaseType" in df.columns:
+                df = df.drop(columns=["DiseaseType"])
+
+            for fname in self.feature_names:
+                if fname not in df.columns:
+                    df[fname] = 0.0
+
+            X = df[self.feature_names]
+            y = df[self.target_column]
+
+            if len(X) < 10:
+                continue
+
+            stratify = y if y.nunique() > 1 else None
+            X_train_raw, X_test_raw, y_train, y_test = train_test_split(
+                X,
+                y,
+                test_size=test_size,
+                random_state=random_state,
+                stratify=stratify,
+            )
+
+            X_train = pd.DataFrame(
+                self.scaler.transform(X_train_raw),
+                columns=self.feature_names,
+                index=X_train_raw.index,
+            )
+            X_test = pd.DataFrame(
+                self.scaler.transform(X_test_raw),
+                columns=self.feature_names,
+                index=X_test_raw.index,
+            )
+
+            splits[str(disease_name)] = (X_train, X_test, y_train, y_test)
+
+        return splits

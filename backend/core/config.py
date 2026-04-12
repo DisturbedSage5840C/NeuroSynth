@@ -3,6 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +28,14 @@ class Settings(BaseSettings):
     kubeflow_host: str = "http://localhost:8080"
 
     metrics_enabled: bool = True
+    allowed_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def _parse_allowed_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [v.strip() for v in value.split(",") if v.strip()]
+        return value
 
 
 @lru_cache

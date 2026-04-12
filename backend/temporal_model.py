@@ -104,6 +104,12 @@ class TemporalProgressionModel:
 
     def predict_trajectory(self, patient_features: np.ndarray, current_probability: float) -> dict[str, Any]:
         months = np.array([6, 12, 18, 24, 30, 36], dtype=float)
+        self.model.eval()
+        with torch.no_grad():
+            seq = np.repeat(np.asarray(patient_features, dtype=np.float32)[None, :], repeats=4, axis=0)
+            seq_tensor = torch.tensor(seq[None, :, :], dtype=torch.float32)
+            lstm_prob = float(self.model(seq_tensor).squeeze().item())
+
         mmse = float(patient_features[self.mmse_idx])
         functional = float(patient_features[self.func_idx])
         adl = float(patient_features[self.adl_idx])
@@ -113,7 +119,8 @@ class TemporalProgressionModel:
         adl_risk = np.clip((10 - adl) / 10.0, 0.0, 1.0)
         rate = 0.45 * impairment + 0.3 * functional_risk + 0.25 * adl_risk
 
-        p0 = float(np.clip(current_probability, 0.01, 0.99))
+        _ = current_probability
+        p0 = float(np.clip(lstm_prob, 0.01, 0.99))
 
         if p0 > 0.7:
             growth = 1 - np.exp(-0.09 * (months / 6.0) * (1 + rate))

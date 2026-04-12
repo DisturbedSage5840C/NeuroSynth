@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, NavLink } from 'react-router';
 import { useNavigate } from 'react-router';
 import { LayoutDashboard, FileText, Database, Brain, BarChart2, LogOut } from 'lucide-react';
 import { PatientSidebar } from './PatientSidebar';
 import { patients } from '../data/mock-data';
 import { useAuthStore } from '../../../state/authStore';
+import { useAnalysisStore } from '../../../state/analysisStore';
 
 const navItems = [
   { to: '/', icon: <LayoutDashboard size={16} />, label: 'Dashboard' },
@@ -15,8 +16,15 @@ const navItems = [
 
 export function Layout() {
   const [selectedPatientId, setSelectedPatientId] = useState(patients[0].id);
+  const latestAnalysis = useAnalysisStore((s) => s.result);
   const navigate = useNavigate();
   const clear = useAuthStore((s) => s.clear);
+
+  useEffect(() => {
+    if (latestAnalysis?.patient_id) {
+      setSelectedPatientId(latestAnalysis.patient_id);
+    }
+  }, [latestAnalysis?.patient_id]);
 
   const handleLogout = async () => {
     try {

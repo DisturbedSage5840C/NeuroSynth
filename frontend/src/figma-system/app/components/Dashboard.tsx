@@ -134,7 +134,7 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
           <ForecastChart analysisResult={analysisResult as AnalysisResult | null} />
 
           {/* Row 2: Biomarker strip */}
-          <BiomarkerStrip />
+          <BiomarkerStrip patientId={patient.id} />
 
           {/* Row 3: Connectome + Genomic */}
           <div className="grid grid-cols-2 gap-4">

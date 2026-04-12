@@ -7,6 +7,9 @@ interface ApiPatientSummary {
   id?: string;
   name?: string;
   updated_at?: string;
+  probability?: number;
+  risk_level?: string;
+  disease_classification?: { predicted_disease?: string };
 }
 
 function toUiPatient(item: ApiPatientSummary, index: number): Patient {
@@ -18,9 +21,13 @@ function toUiPatient(item: ApiPatientSummary, index: number): Patient {
     age: 60 + (index % 20),
     sex: index % 2 === 0 ? 'M' : 'F',
     mrn: id,
-    diagnosis: 'Neurology Monitoring',
-    deteriorationProb: 0.4,
-    riskLevel: 'moderate',
+    diagnosis: item.disease_classification?.predicted_disease || 'Neurology Monitoring',
+    deteriorationProb: typeof item.probability === 'number' ? item.probability : 0.4,
+    riskLevel:
+      String(item.risk_level || 'moderate').toLowerCase().includes('critical') ? 'critical' :
+      String(item.risk_level || 'moderate').toLowerCase().includes('high') ? 'high' :
+      String(item.risk_level || 'moderate').toLowerCase().includes('low') ? 'low' :
+      'moderate',
     lastUpdated: item.updated_at || nowIso,
     admissionDate: nowIso.slice(0, 10),
     ward: 'Neuro',
