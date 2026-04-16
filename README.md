@@ -223,6 +223,8 @@ Demo credentials:
 - `researcher@neurosynth.local` / `neurosynth`
 - `admin@neurosynth.local` / `neurosynth`
 
+Role selection is strictly validated against the account. For example, clinician credentials cannot sign in as admin.
+
 Login payload must include role:
 
 ```json
