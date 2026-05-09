@@ -73,6 +73,18 @@ sequenceDiagram
 | Patient history + timeline | Implemented | `/patients`, `/patients/{id}/analyses`, Explorer UI |
 | Performance visualization | Implemented | `/predictions/model/performance`, `/performance` |
 
+## What's New in v2
+
+The v2 update introduces significant enhancements across the stack:
+
+- **v2 Inference API**: New optimized endpoints (`/predictions/v2/*`, `/reports/v2/*`) and an enhanced model registry (`model_hub`).
+- **Advanced Validation Framework**: Comprehensive checks for fairness, robustness, feature interactions, and clinical auditing (`src/neurosynth/validation/`).
+- **Frontend Visualization Suite**: New React components for explainability including `ClinicalReportViewer`, `CounterfactualPanel`, `RiskScoreGauge`, and `SHAPWaterfallPanel`.
+- **External Data Connectors**: Integrations for GNOMAD, OpenNeuro, and UK Biobank (UKBB) (`src/neurosynth/connectors/`).
+- **Calibrated Ensemble Models**: Advanced pipeline leveraging CatBoost, Extra Trees, Gradient Boosting, and a Meta-Learner (`models/ensemble_v2/`).
+- **Data Version Control**: Integrated `dvc.yaml` for tracking data pipelines and model provenance.
+- **Expanded Test Coverage**: Priority-based testing pipelines across models, inference, and validation.
+
 ## Tech Stack
 
 - Backend: FastAPI, asyncpg, Redis, Celery, pydantic-settings, slowapi, structlog
@@ -87,6 +99,7 @@ sequenceDiagram
 backend/            FastAPI app, models, routers, Celery tasks
 frontend/           React app and clinical UI
 models/             Trained model artifacts and manifest cache
+src/neurosynth/     Core data logic, connectors, and advanced validation (v2)
 scripts/            Training and release helper scripts
 tests/              Integration and quality checks
 docker-compose.yml  Local orchestration (API, worker, DB, Redis)
