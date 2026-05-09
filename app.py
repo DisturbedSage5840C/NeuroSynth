@@ -1,10 +1,32 @@
 from __future__ import annotations
 
+import logging
 import os
+import warnings
 from typing import Any
 
 import gradio as gr
 import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+# =========================================================================
+# DEPRECATION NOTICE
+# =========================================================================
+# This Gradio interface is DEPRECATED in favor of the React frontend.
+# It imports backend classes directly, causing double model loading when
+# run alongside the FastAPI server. Use the React frontend at
+# http://localhost:5173 instead.
+#
+# To run the FastAPI backend only:  uvicorn backend.api:app
+# To run the React frontend:       cd frontend && npm run dev
+# =========================================================================
+warnings.warn(
+    "app.py (Gradio UI) is deprecated. Use the React frontend instead. "
+    "See README.md for instructions.",
+    DeprecationWarning,
+    stacklevel=1,
+)
 
 from backend.biomarker_model import BiomarkerPredictor
 from backend.causal_engine import NeuralCausalDiscovery
@@ -65,7 +87,8 @@ def _init() -> None:
         if len(causal_cols) == len(causal.variables):
             causal.fit(pipeline.df_processed[causal.variables].values.astype(float))
 
-    reporter = ClinicalReportGenerator(os.getenv("HF_TOKEN", ""))
+    hf_token = os.getenv("HF_TOKEN") or None  # Ensure None, not empty string
+    reporter = ClinicalReportGenerator(hf_token)
 
     metrics = predictor.evaluate(X_test.values, y_test.values)
     STATE.update(
@@ -88,6 +111,7 @@ def _to_payload(values: list[float]) -> dict[str, float]:
 
 
 def analyze(*values: float):
+    _ensure_initialized()
     payload = _to_payload(list(values))
     frame = pd.DataFrame([payload])
     scaled = STATE["scaler"].transform(frame[STATE["feature_names"]])
@@ -104,6 +128,7 @@ def analyze(*values: float):
 
 
 def clinical_report(*values: float):
+    _ensure_initialized()
     payload = _to_payload(list(values))
     frame = pd.DataFrame([payload])
     scaled = STATE["scaler"].transform(frame[STATE["feature_names"]])
@@ -129,6 +154,7 @@ def clinical_report(*values: float):
 
 
 def show_causal():
+    _ensure_initialized()
     graph = STATE["causal"].get_causal_graph()
     edges = pd.DataFrame(graph.get("edges", []))
     insight = (
@@ -154,7 +180,15 @@ def perf_text():
     )
 
 
-_init()
+_initialized = False
+
+
+def _ensure_initialized() -> None:
+    global _initialized
+    if not _initialized:
+        logger.info("Initializing Gradio backend (deprecated — use React frontend)...")
+        _init()
+        _initialized = True
 
 with gr.Blocks(
     title="🧠 NeuroSynth — Advanced Neurological AI Platform",

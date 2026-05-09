@@ -10,6 +10,7 @@ import { PatientInputPanel } from './PatientInputPanel';
 import { useAnalysisStore } from '../../../state/analysisStore';
 import type { AnalysisResult } from '../types/analysis';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { RiskScoreGauge, SHAPWaterfallPanel, CounterfactualPanel, ClinicalReportViewer } from './v2';
 import { usePatients } from '../hooks/usePatients';
 
 interface DashboardProps {
@@ -182,6 +183,41 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
               </div>
             )}
           </div>
+
+          {/* v2: Explainability & Report Panels */}
+          {analysisResult && (
+            <>
+              {/* Risk Gauge + SHAP side-by-side */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="rounded-xl border border-border bg-card p-5 flex items-center justify-center">
+                  <RiskScoreGauge
+                    probability={probability}
+                    riskLevel={riskLevel}
+                    confidence={analysisResult.confidence || 'Medium'}
+                    modelCount={analysisResult.individual_model_probs ? Object.keys(analysisResult.individual_model_probs).length : 5}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <SHAPWaterfallPanel
+                    shapValues={(analysisResult.shap_values || []).map((sv: any) => ({
+                      feature: sv.feature || '',
+                      value: typeof sv.value === 'number' ? sv.value : 0,
+                    }))}
+                  />
+                </div>
+              </div>
+
+              {/* Counterfactual + Clinical Report */}
+              <div className="grid grid-cols-2 gap-4">
+                <CounterfactualPanel
+                  counterfactuals={(analysisResult as any).counterfactuals || []}
+                />
+                <ClinicalReportViewer
+                  report={(analysisResult as any).report_soap || null}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

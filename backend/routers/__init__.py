@@ -1,4 +1,4 @@
-from backend.routers import admin, auth, biomarkers, causal, health, patients, pipelines, predictions, reports
+from backend.routers import admin, auth, biomarkers, causal, health, patients, pipelines, predictions, predictions_v2, reports, reports_v2
 
 __all__ = [
     "admin",
@@ -9,5 +9,7 @@ __all__ = [
     "patients",
     "pipelines",
     "predictions",
+    "predictions_v2",
     "reports",
+    "reports_v2",
 ]

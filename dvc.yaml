@@ -1,0 +1,105 @@
+stages:
+  # Stage 1: Load and validate the clinical CSV
+  load_csv:
+    cmd: >-
+      python -c "
+      from neurosynth.data.feature_engineering import FeatureMatrixBuilder;
+      builder = FeatureMatrixBuilder();
+      matrix = builder.build_from_csv('neurological_disease_data.csv');
+      matrix.to_parquet('data/processed/features_tier1.parquet', index=False);
+      print(f'Saved {len(matrix)} rows')
+      "
+    deps:
+      - neurological_disease_data.csv
+      - src/neurosynth/data/schema.py
+      - src/neurosynth/data/feature_engineering.py
+    outs:
+      - data/processed/features_tier1.parquet
+
+  # Stage 2: Run quality checks on loaded data
+  quality_check:
+    cmd: >-
+      python -c "
+      import pandas as pd;
+      from neurosynth.data.quality import DataQualityAgent;
+      import json;
+      df = pd.read_parquet('data/processed/features_tier1.parquet');
+      agent = DataQualityAgent(reference_df=df);
+      report = agent.assess(df, batch_id='initial_load');
+      with open('data/processed/quality_report.json', 'w') as f:
+          json.dump(report.to_dict(), f, indent=2);
+      print(f'Quality score: {report.overall_quality_score:.4f}')
+      "
+    deps:
+      - data/processed/features_tier1.parquet
+      - src/neurosynth/data/quality.py
+    outs:
+      - data/processed/quality_report.json
+    metrics:
+      - data/processed/quality_report.json:
+          cache: false
+
+  # Stage 3: Compute derived features
+  feature_engineering:
+    cmd: >-
+      python -c "
+      import pandas as pd;
+      from neurosynth.data.feature_engineering import FeatureMatrixBuilder;
+      df = pd.read_parquet('data/processed/features_tier1.parquet');
+      enriched = FeatureMatrixBuilder.compute_derived_features(df);
+      enriched.to_parquet('data/processed/features_enriched.parquet', index=False);
+      coverage = FeatureMatrixBuilder.tier_coverage(enriched);
+      import json;
+      with open('data/processed/tier_coverage.json', 'w') as f:
+          json.dump(coverage, f, indent=2);
+      print(f'Features: {len(enriched.columns)}, Rows: {len(enriched)}')
+      "
+    deps:
+      - data/processed/features_tier1.parquet
+      - src/neurosynth/data/feature_engineering.py
+    outs:
+      - data/processed/features_enriched.parquet
+    metrics:
+      - data/processed/tier_coverage.json:
+          cache: false
+
+  # Stage 4: Train disease classifier on processed data
+  train_classifier:
+    cmd: >-
+      python -c "
+      from backend.disease_classifier import DiseaseClassifier;
+      clf = DiseaseClassifier();
+      clf.train();
+      print('Disease classifier trained')
+      "
+    deps:
+      - neurological_disease_data.csv
+      - backend/disease_classifier.py
+    outs:
+      - models/disease_clf.pkl
+      - models/disease_le.pkl
+      - models/disease_features.pkl
+
+  # Stage 5: Pretrain full model suite
+  pretrain:
+    cmd: python scripts/pretrain.py --dataset neurological_disease_data.csv --models-dir models
+    deps:
+      - neurological_disease_data.csv
+      - scripts/pretrain.py
+      - backend/data_pipeline.py
+      - backend/biomarker_model.py
+      - backend/temporal_model.py
+      - backend/causal_engine.py
+    outs:
+      - models/scaler.pkl
+      - models/rf_model.pkl
+      - models/gb_model.pkl
+      - models/lr_model.pkl
+      - models/lstm_model.pt
+      - models/causal_graph.npy
+      - models/model_manifest.json
+
+plots:
+  - data/processed/quality_report.json:
+      x: batch_id
+      y: overall_quality_score

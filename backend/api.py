@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import time
 import asyncio
 import hashlib
 import json
+import logging
 import subprocess
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 from uuid import uuid4
@@ -45,8 +47,13 @@ def _md5(path: Path) -> str:
 
 
 def _manifest_valid(models_dir: Path, dataset_file: Path) -> bool:
+    _log = logging.getLogger("neurosynth.bootstrap")
     manifest_file = models_dir / "model_manifest.json"
-    if not manifest_file.exists() or not dataset_file.exists():
+    if not manifest_file.exists():
+        _log.warning("manifest_check_failed: manifest file missing at %s", manifest_file)
+        return False
+    if not dataset_file.exists():
+        _log.warning("manifest_check_failed: dataset file missing at %s", dataset_file)
         return False
 
     required = [
@@ -62,17 +69,31 @@ def _manifest_valid(models_dir: Path, dataset_file: Path) -> bool:
     ]
     for file_name in required:
         if not (models_dir / file_name).exists():
+            _log.warning("manifest_check_failed: required artifact missing: %s", file_name)
             return False
 
     try:
         manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as e:
+        _log.warning("manifest_check_failed: corrupt manifest JSON: %s", e)
         return False
 
-    return str(manifest.get("dataset_md5", "")) == _md5(dataset_file)
+    expected_md5 = str(manifest.get("dataset_md5", ""))
+    actual_md5 = _md5(dataset_file)
+    if expected_md5 != actual_md5:
+        _log.warning(
+            "manifest_check_failed: dataset MD5 mismatch (expected=%s, actual=%s)",
+            expected_md5, actual_md5,
+        )
+        return False
+    return True
 
 
-def _run_pretrain(dataset_file: Path, models_dir: Path) -> None:
+_pretrain_executor = ThreadPoolExecutor(max_workers=1)
+
+
+def _run_pretrain_sync(dataset_file: Path, models_dir: Path) -> None:
+    """Synchronous pretrain — called inside a thread executor."""
     cmd = [
         sys.executable,
         "scripts/pretrain.py",
@@ -82,6 +103,12 @@ def _run_pretrain(dataset_file: Path, models_dir: Path) -> None:
         str(models_dir),
     ]
     subprocess.run(cmd, check=True)
+
+
+async def _run_pretrain(dataset_file: Path, models_dir: Path) -> None:
+    """Run pretrain in a thread to avoid blocking the async event loop."""
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(_pretrain_executor, _run_pretrain_sync, dataset_file, models_dir)
 
 
 async def _drain_celery_queue(timeout_seconds: int = 20) -> None:
@@ -128,7 +155,7 @@ async def lifespan(app: FastAPI):
         dataset_file = _dataset_path()
         from_cache = _manifest_valid(models_dir, dataset_file)
         if not from_cache:
-            _run_pretrain(dataset_file=dataset_file, models_dir=models_dir)
+            await _run_pretrain(dataset_file=dataset_file, models_dir=models_dir)
 
         registry = ModelRegistry(models_dir=models_dir).load_all()
 

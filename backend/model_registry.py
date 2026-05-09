@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-import json
 
 import joblib
 import numpy as np
 import torch
+
+logger = logging.getLogger(__name__)
 
 
 class ModelRegistry:
@@ -46,7 +49,11 @@ class ModelRegistry:
             predictor.lr = joblib.load(lr_model)
 
         temporal = TemporalProgressionModel(feature_names)
-        lstm_state = torch.load(self.models_dir / "lstm_model.pt", map_location="cpu")
+        lstm_state = torch.load(
+            self.models_dir / "lstm_model.pt",
+            map_location="cpu",
+            weights_only=True,
+        )
         temporal.model.load_state_dict(lstm_state)
 
         variables = None
@@ -69,7 +76,8 @@ class ModelRegistry:
         )
         try:
             multi_predictor.load_from_disk()
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to load multi-disease predictor: %s", e)
             multi_predictor = None
 
         manifest = {}

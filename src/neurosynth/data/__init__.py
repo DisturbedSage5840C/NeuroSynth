@@ -1,21 +1,31 @@
-from neurosynth.data.contracts import TABLE_SCHEMAS, validate_frame
-from neurosynth.data.dask_features import build_patient_feature_matrix
-from neurosynth.data.genomics_pipeline import GenomicsIngestionPipeline
-from neurosynth.data.iceberg_catalog import IcebergDomainCatalog, IcebergTableSpec
-from neurosynth.data.imaging_pipeline import DICOMIngestionPipeline, ImagingQCResult
-from neurosynth.data.kafka_streaming import WearableKafkaBridge, WearableWindowAggregator
-from neurosynth.data.neo4j_graph import NeuroKnowledgeGraphBuilder
+"""NeuroSynth v2 Data Layer.
+
+Provides schema definitions, quality checks, and feature engineering
+for the multi-modal clinical data pipeline.
+"""
+from neurosynth.data.feature_engineering import FeatureMatrixBuilder
+from neurosynth.data.quality import DataQualityAgent, QualityReport
+from neurosynth.data.schema import (
+    ALL_FEATURES,
+    FEATURE_REGISTRY,
+    TIER_1_FEATURES,
+    TIER_2_FEATURES,
+    FeatureTier,
+    ICD10_MAPPING,
+    NeuroSynthTier1Schema,
+    NeuroSynthTier2Schema,
+)
 
 __all__ = [
-    "TABLE_SCHEMAS",
-    "validate_frame",
-    "build_patient_feature_matrix",
-    "GenomicsIngestionPipeline",
-    "IcebergDomainCatalog",
-    "IcebergTableSpec",
-    "DICOMIngestionPipeline",
-    "ImagingQCResult",
-    "WearableKafkaBridge",
-    "WearableWindowAggregator",
-    "NeuroKnowledgeGraphBuilder",
+    "ALL_FEATURES",
+    "DataQualityAgent",
+    "FEATURE_REGISTRY",
+    "FeatureMatrixBuilder",
+    "FeatureTier",
+    "ICD10_MAPPING",
+    "NeuroSynthTier1Schema",
+    "NeuroSynthTier2Schema",
+    "QualityReport",
+    "TIER_1_FEATURES",
+    "TIER_2_FEATURES",
 ]

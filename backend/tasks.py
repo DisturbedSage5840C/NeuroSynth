@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 
-from celery import chain
+from celery import chord, group
 from redis import Redis
 
 from backend.celery_app import celery_app
@@ -16,6 +16,10 @@ from backend.core.metrics import ML_INFERENCE_DURATION
 from backend.model_registry import ModelRegistry
 from backend.core.security import hash_patient_id
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _publisher() -> Redis:
     return Redis.from_url(get_settings().redis_url, decode_responses=True)
@@ -29,8 +33,12 @@ def _publish_progress(task_id: str, phase: str, progress: int, patient_id: str |
         "patient_id_hash": hash_patient_id(patient_id),
         "timestamp": datetime.now(tz=UTC).isoformat(),
     }
-    redis_client = _publisher()
-    redis_client.publish("biomarkers.progress", json.dumps(payload))
+    try:
+        redis_client = _publisher()
+        redis_client.publish("biomarkers.progress", json.dumps(payload))
+    except Exception:
+        # Redis unavailability should not crash tasks.
+        pass
 
 
 def _get_registry_state():
@@ -63,8 +71,24 @@ def _mark_duration(phase: str, started: datetime) -> int:
     return duration_ms
 
 
-@celery_app.task(name="connectome_inference", bind=True)
+# ---------------------------------------------------------------------------
+# Default retry policy for all ML tasks.
+# Retries up to 3 times with exponential backoff (60s, 120s, 180s).
+# ---------------------------------------------------------------------------
+_TASK_DEFAULTS = dict(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+)
+
+
+@celery_app.task(name="connectome_inference", **_TASK_DEFAULTS)
 def connectome_inference(self, patient_id: str) -> dict[str, object]:
+    """Run connectome feature importance inference for a patient."""
     phase = "connectome_inference"
     started = datetime.now(tz=UTC)
     _publish_progress(self.request.id, phase, 0, patient_id)
@@ -80,11 +104,15 @@ def connectome_inference(self, patient_id: str) -> dict[str, object]:
             "feature_importance": feature_importance,
         }
     except Exception as exc:
-        return {"phase": phase, "status": "error", "error": str(exc)}
+        # Let autoretry_for handle retries.  On final failure, record error.
+        if self.request.retries >= self.max_retries:
+            return {"phase": phase, "status": "error", "error": str(exc), "retries_exhausted": True}
+        raise
 
 
-@celery_app.task(name="genomic_risk_score", bind=True)
+@celery_app.task(name="genomic_risk_score", **_TASK_DEFAULTS)
 def genomic_risk_score(self, patient_id: str) -> dict[str, object]:
+    """Compute genomic risk score for a patient."""
     phase = "genomic_risk_score"
     started = datetime.now(tz=UTC)
     _publish_progress(self.request.id, phase, 0, patient_id)
@@ -114,11 +142,14 @@ def genomic_risk_score(self, patient_id: str) -> dict[str, object]:
             "prediction": pred,
         }
     except Exception as exc:
-        return {"phase": phase, "status": "error", "error": str(exc)}
+        if self.request.retries >= self.max_retries:
+            return {"phase": phase, "status": "error", "error": str(exc), "retries_exhausted": True}
+        raise
 
 
-@celery_app.task(name="temporal_forecast", bind=True)
+@celery_app.task(name="temporal_forecast", **_TASK_DEFAULTS)
 def temporal_forecast(self, patient_id: str) -> dict[str, object]:
+    """Generate temporal trajectory forecast for a patient."""
     phase = "temporal_forecast"
     started = datetime.now(tz=UTC)
     _publish_progress(self.request.id, phase, 0, patient_id)
@@ -156,11 +187,14 @@ def temporal_forecast(self, patient_id: str) -> dict[str, object]:
             "trajectory": traj,
         }
     except Exception as exc:
-        return {"phase": phase, "status": "error", "error": str(exc)}
+        if self.request.retries >= self.max_retries:
+            return {"phase": phase, "status": "error", "error": str(exc), "retries_exhausted": True}
+        raise
 
 
-@celery_app.task(name="causal_analysis", bind=True)
+@celery_app.task(name="causal_analysis", **_TASK_DEFAULTS)
 def causal_analysis(self, patient_id: str) -> dict[str, object]:
+    """Run causal graph analysis for a patient."""
     phase = "causal_analysis"
     started = datetime.now(tz=UTC)
     _publish_progress(self.request.id, phase, 0, patient_id)
@@ -176,11 +210,14 @@ def causal_analysis(self, patient_id: str) -> dict[str, object]:
             "causal_graph": graph,
         }
     except Exception as exc:
-        return {"phase": phase, "status": "error", "error": str(exc)}
+        if self.request.retries >= self.max_retries:
+            return {"phase": phase, "status": "error", "error": str(exc), "retries_exhausted": True}
+        raise
 
 
-@celery_app.task(name="report_generation", bind=True)
+@celery_app.task(name="report_generation", **_TASK_DEFAULTS)
 def report_generation(self, patient_id: str, notes: str | None = None) -> dict[str, object]:
+    """Generate a clinical report for a patient."""
     phase = "report_generation"
     started = datetime.now(tz=UTC)
     _publish_progress(self.request.id, phase, 0, patient_id)
@@ -233,16 +270,46 @@ def report_generation(self, patient_id: str, notes: str | None = None) -> dict[s
             "report": report,
         }
     except Exception as exc:
-        return {"phase": phase, "status": "error", "error": str(exc)}
+        if self.request.retries >= self.max_retries:
+            return {"phase": phase, "status": "error", "error": str(exc), "retries_exhausted": True}
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Aggregation callback — collects results from parallel tasks.
+# ---------------------------------------------------------------------------
+
+@celery_app.task(name="aggregate_pipeline_results", bind=True)
+def aggregate_pipeline_results(self, results: list[dict[str, object]], patient_id: str) -> dict[str, object]:
+    """Aggregate results from all pipeline phases into a single response."""
+    aggregated: dict[str, object] = {"patient_id": patient_id, "phases": {}}
+    errors: list[str] = []
+    for result in results:
+        phase = result.get("phase", "unknown")
+        aggregated["phases"][phase] = result
+        if result.get("status") == "error":
+            errors.append(f"{phase}: {result.get('error', 'unknown error')}")
+
+    aggregated["status"] = "error" if errors else "completed"
+    if errors:
+        aggregated["errors"] = errors
+    aggregated["completed_at"] = datetime.now(tz=UTC).isoformat()
+    return aggregated
 
 
 def enqueue_full_pipeline(patient_id: str) -> str:
-    workflow = chain(
-        connectome_inference.si(patient_id),
-        genomic_risk_score.si(patient_id),
-        temporal_forecast.si(patient_id),
-        causal_analysis.si(patient_id),
-        report_generation.si(patient_id),
+    """Enqueue all pipeline phases in parallel with result aggregation.
+
+    Uses ``chord`` (``group`` + callback) so every phase runs concurrently
+    and results are collected by ``aggregate_pipeline_results``.
+    """
+    parallel_tasks = group(
+        connectome_inference.s(patient_id),
+        genomic_risk_score.s(patient_id),
+        temporal_forecast.s(patient_id),
+        causal_analysis.s(patient_id),
+        report_generation.s(patient_id),
     )
-    result = workflow.apply_async()
+    callback = aggregate_pipeline_results.s(patient_id=patient_id)
+    result = chord(parallel_tasks)(callback)
     return result.id

@@ -77,12 +77,26 @@ class BiomarkerPredictor:
     def load_from_disk(self) -> None:
         self.rf = joblib.load(self.models_dir / "rf_model.pkl")
         self.gb = joblib.load(self.models_dir / "gb_model.pkl")
+
         xgb_path = self.models_dir / "xgboost_model.pkl"
+        et_path = self.models_dir / "extra_trees_model.pkl"
         if xgb_path.exists():
             self.third = joblib.load(xgb_path)
             self.third_name = "xgboost"
+        elif et_path.exists():
+            self.third = joblib.load(et_path)
+            self.third_name = "extra_trees"
         else:
-            self.third = joblib.load(self.models_dir / "extra_trees_model.pkl")
+            # Neither third-model artifact exists; create an untrained fallback
+            # so that the ensemble can still function with RF+GB+LR.
+            import logging
+            logging.getLogger(__name__).warning(
+                "No third model artifact found (xgboost_model.pkl or extra_trees_model.pkl). "
+                "Using a fresh ExtraTreesClassifier — predictions may be degraded."
+            )
+            self.third = ExtraTreesClassifier(
+                n_estimators=300, random_state=42, class_weight="balanced", n_jobs=-1,
+            )
             self.third_name = "extra_trees"
 
         lr_path = self.models_dir / "lr_model.pkl"

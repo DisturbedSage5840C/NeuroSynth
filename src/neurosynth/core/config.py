@@ -32,3 +32,16 @@ class NeuroSynthSettings(BaseSettings):
 
     mqtt_host: str = Field(default="localhost")
     mqtt_port: int = Field(default=1883)
+
+    # --- v2: New connector settings ---
+    ukbb_data_dir: str = Field(default="data/ukbb")
+    ukbb_application_id: str = Field(default="")
+    ukbb_key_path: str = Field(default="")
+
+    openneuro_download_dir: str = Field(default="data/openneuro")
+    openneuro_datasets: str = Field(
+        default="ds000030,ds004169",
+        description="Comma-separated OpenNeuro dataset IDs",
+    )
+
+    gnomad_dataset_id: str = Field(default="gnomad_r4")

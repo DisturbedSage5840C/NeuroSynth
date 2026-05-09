@@ -169,8 +169,10 @@ class NeuralCausalDiscovery(nn.Module):
     def get_causal_graph(self) -> dict[str, Any]:
         self._load_if_needed()
         W = self.latest_W
-        diag_idx = self.variables.index("Diagnosis")
-        mmse_idx = self.variables.index("MMSE")
+
+        # Safe variable lookups — avoid ValueError if variables are missing.
+        diag_idx = self.variables.index("Diagnosis") if "Diagnosis" in self.variables else None
+        mmse_idx = self.variables.index("MMSE") if "MMSE" in self.variables else None
 
         edges = []
         for i, src in enumerate(self.variables):
@@ -189,7 +191,9 @@ class NeuralCausalDiscovery(nn.Module):
                         }
                     )
 
-        def top_causes(target_idx: int, k: int) -> list[dict[str, float]]:
+        def top_causes(target_idx: int | None, k: int) -> list[dict[str, float]]:
+            if target_idx is None:
+                return []
             vals = []
             for i, name in enumerate(self.variables):
                 if i == target_idx:
@@ -204,20 +208,25 @@ class NeuralCausalDiscovery(nn.Module):
         protective = []
         amplifiers = []
         modifiable = []
-        for name, eff in [(self.variables[i], float(W[i, diag_idx])) for i in range(len(self.variables)) if i != diag_idx]:
-            if name in {"PhysicalActivity", "SleepQuality", "MMSE", "FunctionalAssessment", "ADL", "Depression"}:
-                if eff < 0.35:
-                    protective.append({"variable": name, "effect": round(-abs(eff), 4)})
-                if eff > 0.45:
-                    amplifiers.append({"variable": name, "effect": round(eff, 4)})
-                modifiable.append(
-                    {
-                        "variable": name,
-                        "current_effect": round(eff, 4),
-                        "intervention_direction": "increase" if name in {"PhysicalActivity", "SleepQuality", "MMSE", "FunctionalAssessment", "ADL"} else "decrease",
-                        "expected_impact": "Potential reduction in modeled diagnosis risk",
-                    }
-                )
+        if diag_idx is not None:
+            for i in range(len(self.variables)):
+                if i == diag_idx:
+                    continue
+                name = self.variables[i]
+                eff = float(W[i, diag_idx])
+                if name in {"PhysicalActivity", "SleepQuality", "MMSE", "FunctionalAssessment", "ADL", "Depression"}:
+                    if eff < 0.35:
+                        protective.append({"variable": name, "effect": round(-abs(eff), 4)})
+                    if eff > 0.45:
+                        amplifiers.append({"variable": name, "effect": round(eff, 4)})
+                    modifiable.append(
+                        {
+                            "variable": name,
+                            "current_effect": round(eff, 4),
+                            "intervention_direction": "increase" if name in {"PhysicalActivity", "SleepQuality", "MMSE", "FunctionalAssessment", "ADL"} else "decrease",
+                            "expected_impact": "Potential reduction in modeled diagnosis risk",
+                        }
+                    )
 
         return {
             "variables": self.variables,

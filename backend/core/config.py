@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +36,20 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [v.strip() for v in value.split(",") if v.strip()]
         return value
+
+    @model_validator(mode="after")
+    def _validate_secrets_in_prod(self) -> "Settings":
+        """Ensure sensitive defaults are not used in staging/production."""
+        if self.app_env in ("staging", "prod"):
+            if self.jwt_secret == "change-me":
+                raise ValueError(
+                    "NEUROSYNTH_JWT_SECRET must be changed from the default in %s environment" % self.app_env
+                )
+            if self.patient_hash_secret == "change-me-patient-hmac":
+                raise ValueError(
+                    "NEUROSYNTH_PATIENT_HASH_SECRET must be changed from the default in %s environment" % self.app_env
+                )
+        return self
 
 
 @lru_cache

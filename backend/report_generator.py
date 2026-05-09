@@ -1,17 +1,25 @@
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
 
-import requests
+import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class ClinicalReportGenerator:
     endpoint = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3"
+    # Configurable timeouts (seconds)
+    connect_timeout: float = 10.0
+    read_timeout: float = 45.0
 
     def __init__(self, hf_token: str | None = None) -> None:
         self.hf_token = hf_token or os.getenv("HF_TOKEN", "")
+        if not self.hf_token:
+            logger.info("ClinicalReportGenerator: no HF_TOKEN set, will use fallback reports")
 
     @staticmethod
     def _sections_from_text(text: str) -> dict[str, str]:
@@ -108,6 +116,7 @@ class ClinicalReportGenerator:
         causal_graph: dict[str, Any],
         shap_values: list[dict[str, float]],
     ) -> dict[str, Any]:
+        """Generate a clinical report.  Synchronous — safe to call from threads."""
         top_risk_factors = [f"{r['feature']} ({r['value']:+.4f})" for r in shap_values[:5]]
         causal_summary = ", ".join([f"{x['variable']}:{x['strength']}" for x in causal_graph.get("top_causes_of_Diagnosis", [])])
 
@@ -149,7 +158,7 @@ IMPORTANT: This is a research tool. Always include disclaimer that clinical deci
             return self._fallback_report(patient_data, prediction, trajectory, causal_graph, shap_values)
 
         headers = {"Authorization": f"Bearer {self.hf_token}"}
-        payload = {
+        request_payload = {
             "inputs": prompt,
             "parameters": {
                 "max_new_tokens": 900,
@@ -159,9 +168,17 @@ IMPORTANT: This is a research tool. Always include disclaimer that clinical deci
         }
 
         try:
-            resp = requests.post(self.endpoint, headers=headers, json=payload, timeout=90)
-            resp.raise_for_status()
-            body = resp.json()
+            timeout = httpx.Timeout(
+                connect=self.connect_timeout,
+                read=self.read_timeout,
+                write=10.0,
+                pool=5.0,
+            )
+            with httpx.Client(timeout=timeout) as client:
+                resp = client.post(self.endpoint, headers=headers, json=request_payload)
+                resp.raise_for_status()
+                body = resp.json()
+
             if isinstance(body, list) and body and isinstance(body[0], dict):
                 raw_text = body[0].get("generated_text", "")
             elif isinstance(body, dict):
@@ -176,5 +193,32 @@ IMPORTANT: This is a research tool. Always include disclaimer that clinical deci
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "word_count": len(raw_text.split()),
             }
-        except Exception:
+        except httpx.TimeoutException:
+            logger.warning("LLM request timed out, serving fallback report")
             return self._fallback_report(patient_data, prediction, trajectory, causal_graph, shap_values)
+        except Exception as e:
+            logger.warning("LLM request failed (%s), serving fallback report", e)
+            return self._fallback_report(patient_data, prediction, trajectory, causal_graph, shap_values)
+
+    async def generate_report_async(
+        self,
+        patient_data: dict[str, Any],
+        prediction: dict[str, Any],
+        trajectory: list[float],
+        causal_graph: dict[str, Any],
+        shap_values: list[dict[str, float]],
+    ) -> dict[str, Any]:
+        """Async version of generate_report for use in async contexts."""
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            self.generate_report,
+            patient_data,
+            prediction,
+            trajectory,
+            causal_graph,
+            shap_values,
+        )
