@@ -1,0 +1,230 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 1,
+  "id": null,
+  "iteration": 1716000000000,
+  "links": [],
+  "panels": [
+    {
+      "title": "Inference Latency (P50 / P95 / P99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(neurosynth_inference_latency_seconds_bucket[5m]))",
+          "legendFormat": "P50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(neurosynth_inference_latency_seconds_bucket[5m]))",
+          "legendFormat": "P95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(neurosynth_inference_latency_seconds_bucket[5m]))",
+          "legendFormat": "P99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Request Rate & Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(neurosynth_inference_requests_total[5m])) by (status)",
+          "legendFormat": "{{status}}"
+        },
+        {
+          "expr": "sum(rate(neurosynth_inference_errors_total[5m]))",
+          "legendFormat": "Errors"
+        }
+      ]
+    },
+    {
+      "title": "Data Drift — PSI per Feature",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "neurosynth_drift_psi",
+          "legendFormat": "{{feature}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.10 },
+              { "color": "orange", "value": 0.20 },
+              { "color": "red", "value": 0.25 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Drift Severity",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "neurosynth_drift_severity",
+          "legendFormat": "Severity"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "NO DRIFT", "color": "green" } } },
+            { "type": "value", "options": { "1": { "text": "MINOR", "color": "yellow" } } },
+            { "type": "value", "options": { "2": { "text": "WARNING", "color": "orange" } } },
+            { "type": "value", "options": { "3": { "text": "CRITICAL", "color": "red" } } }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Features Drifted",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 8 },
+      "targets": [
+        {
+          "expr": "neurosynth_drift_features_drifted",
+          "legendFormat": "Drifted"
+        }
+      ]
+    },
+    {
+      "title": "Model AUC-ROC",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "neurosynth_model_auc",
+          "legendFormat": "{{model_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.75 },
+              { "color": "green", "value": 0.80 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "ECE (Calibration Error)",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 12 },
+      "targets": [
+        {
+          "expr": "neurosynth_model_ece",
+          "legendFormat": "ECE"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 0.2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.05 },
+              { "color": "red", "value": 0.10 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Validation Gate Status",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "neurosynth_gate_status",
+          "legendFormat": "{{gate_name}} ({{gate_type}})",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "title": "Circuit Breaker State",
+      "type": "stat",
+      "gridPos": { "h": 3, "w": 6, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "neurosynth_circuit_breaker_state",
+          "legendFormat": "{{endpoint}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "CLOSED ✅", "color": "green" } } },
+            { "type": "value", "options": { "1": { "text": "OPEN 🔴", "color": "red" } } }
+          ]
+        }
+      }
+    },
+    {
+      "title": "Report Generation Latency",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, rate(neurosynth_report_generation_seconds_bucket[5m]))",
+          "legendFormat": "P95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" }
+      }
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["neurosynth", "production", "monitoring"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "NeuroSynth Production Dashboard",
+  "uid": "neurosynth-prod-v2",
+  "version": 1
+}

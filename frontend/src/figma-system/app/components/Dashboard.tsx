@@ -10,7 +10,7 @@ import { PatientInputPanel } from './PatientInputPanel';
 import { useAnalysisStore } from '../../../state/analysisStore';
 import type { AnalysisResult } from '../types/analysis';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { RiskScoreGauge, SHAPWaterfallPanel, CounterfactualPanel, ClinicalReportViewer } from './v2';
+import { RiskScoreGauge, SHAPWaterfallPanel, CounterfactualPanel, ClinicalReportViewer, TrajectoryChart48, LIMEExplanationPanel, ModelPerformanceMonitor } from './v2';
 import { usePatients } from '../hooks/usePatients';
 
 interface DashboardProps {
@@ -207,6 +207,18 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
                 </div>
               </div>
 
+              {/* 48-month Trajectory + LIME */}
+              <div className="grid grid-cols-2 gap-4">
+                <TrajectoryChart48
+                  values={(analysisResult as any).trajectory || analysisResult.trajectory_48mo?.values || []}
+                  bandsLower={analysisResult.confidence_bands?.lower || []}
+                  bandsUpper={analysisResult.confidence_bands?.upper || []}
+                />
+                <LIMEExplanationPanel
+                  limeValues={(analysisResult as any).lime_explanation || []}
+                />
+              </div>
+
               {/* Counterfactual + Clinical Report */}
               <div className="grid grid-cols-2 gap-4">
                 <CounterfactualPanel
@@ -216,6 +228,15 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
                   report={(analysisResult as any).report_soap || null}
                 />
               </div>
+
+              {/* Model Performance */}
+              <ModelPerformanceMonitor
+                auc={(analysisResult as any).validation?.auc}
+                ece={(analysisResult as any).validation?.ece}
+                f1={(analysisResult as any).validation?.f1}
+                decision={(analysisResult as any).validation?.decision}
+                gates={(analysisResult as any).validation?.gates || []}
+              />
             </>
           )}
         </div>

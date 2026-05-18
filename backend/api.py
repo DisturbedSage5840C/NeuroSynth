@@ -28,7 +28,7 @@ from backend.core.rate_limit import limiter, rate_limit_exceeded_handler
 from backend.core.security import ACCESS_COOKIE, Role, decode_token, hash_patient_id
 from backend.db import get_db
 from backend.deps import require_role
-from backend.routers import admin, auth, biomarkers, causal, health, patients, pipelines, predictions, reports
+from backend.routers import admin, auth, biomarkers, causal, health, patients, pipelines, predictions, predictions_v2, reports, reports_v2
 
 
 def _dataset_path() -> Path:
@@ -272,6 +272,9 @@ app.include_router(causal.router)
 app.include_router(biomarkers.router)
 app.include_router(admin.router)
 app.include_router(pipelines.router)
+# v2 routers
+app.include_router(predictions_v2.router)
+app.include_router(reports_v2.router)
 
 
 @app.get(

@@ -6,7 +6,72 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
-## [2.0.0-alpha.6] — 2026-05-09
+## [2.0.0-alpha.9] — 2026-05-16
+
+### 🏗️ Infrastructure (Priority 9)
+
+#### Docker
+- **`docker-compose.yml`** — Added model-server, Kafka (KRaft), Prometheus, Grafana, and exporters (node, Redis, Postgres)
+- **`Dockerfile.model`** — Separate model-serving container for independent scaling
+
+#### Terraform
+- **`modules/gpu-nodes/main.tf`** — EKS GPU node group (g4dn.xlarge) with NVIDIA taints, device plugin DaemonSet, auto-scaling (0-4)
+- **`modules/kafka/main.tf`** — MSK Kafka cluster (3 brokers, TLS, Prometheus monitoring, CloudWatch logs)
+- Updated `main.tf` with GPU + Kafka modules; added 7 new variables
+
+#### Kubernetes
+- **`infrastructure/k8s/model-server.yaml`** — GPU-tolerant Deployment, ClusterIP Service, HPA (2-8 pods, CPU + latency scaling), model PVC
+
+#### Load Testing
+- **`scripts/load_test.py`** — Locust load test with realistic patient data, weighted task distribution, and stress test user
+
+---
+
+
+
+### 📊 Monitoring & Drift Detection (Priority 8)
+
+#### New Modules (`src/neurosynth/monitoring/`)
+- **`drift_detector.py`** — PSI + KS drift detection with tiered severity:
+  - PSI < 0.10 → NO_DRIFT, 0.10-0.20 → MINOR, 0.20-0.25 → WARNING, ≥ 0.25 → CRITICAL
+  - Structured DriftReport with per-feature results and recommendations
+- **`alerting.py`** — Multi-channel alert dispatch:
+  - Slack (incoming webhook), PagerDuty (Events API v2), structured log
+  - `create_drift_alert()` converts DriftReport → Alert
+- **`metrics.py`** — 15 Prometheus metric definitions:
+  - Inference: latency histogram, request/error counters
+  - Model: AUC/ECE/F1 gauges
+  - Drift: PSI/KS per feature, severity, drifted count
+  - Validation: gate status, circuit breaker state
+
+#### Infrastructure (`infrastructure/`)
+- **`prometheus/prometheus.yml`** — Scrape config (API, model server, GPU, Redis, Postgres)
+- **`grafana/dashboards/neurosynth.json`** — 10-panel dashboard (latency, drift, AUC, gates)
+
+---
+
+
+
+### 🎨 Frontend Redesign (Priority 7)
+
+#### New v2 Components (`frontend/src/figma-system/app/components/v2/`)
+- **`RiskScoreGauge`** — Animated SVG circular gauge with risk-level color coding
+- **`SHAPWaterfallPanel`** — SHAP waterfall chart with animated bidirectional bars
+- **`CounterfactualPanel`** — "What-if" intervention cards with risk delta indicators
+- **`ClinicalReportViewer`** — SOAP report viewer with ICD-10 tab, PDF/FHIR export
+- **`TrajectoryChart48`** — 48-month forecast with confidence bands (Recharts Area)
+- **`LIMEExplanationPanel`** — LIME feature weights with direction indicators
+- **`ModelPerformanceMonitor`** — AUC/ECE/F1/Brier metrics + validation gate status
+
+#### Integration
+- All 7 components integrated into main Dashboard (shown after analysis)
+- ModelPerformanceMonitor added to Performance Dashboard page
+- Added `framer-motion` dependency for micro-animations
+- Build verified: 3082 modules, 0 errors
+
+---
+
+
 
 ### 📋 Clinical Report Generation (Priority 6)
 

@@ -2,3 +2,6 @@ export { RiskScoreGauge } from './RiskScoreGauge';
 export { SHAPWaterfallPanel } from './SHAPWaterfallPanel';
 export { CounterfactualPanel } from './CounterfactualPanel';
 export { ClinicalReportViewer } from './ClinicalReportViewer';
+export { TrajectoryChart48 } from './TrajectoryChart48';
+export { LIMEExplanationPanel } from './LIMEExplanationPanel';
+export { ModelPerformanceMonitor } from './ModelPerformanceMonitor';

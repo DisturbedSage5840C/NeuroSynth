@@ -139,6 +139,36 @@ module "local_dev_minio" {
   minio_console = true
 }
 
+# ── GPU Node Group (Priority 9) ────────────────────────────
+module "gpu_nodes" {
+  source = "./modules/gpu-nodes"
+  count  = var.cloud_provider == "aws" ? 1 : 0
+
+  environment        = local.environment
+  cluster_name       = module.kubernetes_cluster.cluster_name
+  private_subnet_ids = module.networking.private_subnet_ids
+  gpu_instance_type  = var.gpu_instance_type
+  gpu_min_nodes      = var.gpu_min_nodes
+  gpu_max_nodes      = var.gpu_max_nodes
+  gpu_desired_nodes  = var.gpu_desired_nodes
+  tags               = local.common_tags
+}
+
+# ── MSK Kafka Cluster (Priority 9) ─────────────────────────
+module "kafka" {
+  source = "./modules/kafka"
+  count  = var.cloud_provider == "aws" ? 1 : 0
+
+  environment    = local.environment
+  cluster_name   = "neurosynth-kafka-${local.environment}"
+  vpc_id         = module.networking.vpc_id
+  subnet_ids     = module.networking.private_subnet_ids
+  instance_type  = var.kafka_instance_type
+  broker_count   = var.kafka_broker_count
+  ebs_volume_size = var.kafka_ebs_volume_size
+  tags           = local.common_tags
+}
+
 output "kubernetes_cluster_name" {
   value       = module.kubernetes_cluster.cluster_name
   description = "Target Kubernetes cluster name (EKS or GKE)."
@@ -158,3 +188,14 @@ output "lakehouse_bucket" {
   value       = module.lakehouse.bucket_name
   description = "Object storage bucket for Iceberg lakehouse artifacts."
 }
+
+output "gpu_node_group" {
+  value       = var.cloud_provider == "aws" ? module.gpu_nodes[0].gpu_node_group_name : "n/a"
+  description = "GPU node group name (EKS only)."
+}
+
+output "kafka_bootstrap_servers" {
+  value       = var.cloud_provider == "aws" ? module.kafka[0].bootstrap_servers : "n/a"
+  description = "MSK Kafka bootstrap servers."
+}
+
