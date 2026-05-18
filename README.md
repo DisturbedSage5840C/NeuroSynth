@@ -79,11 +79,13 @@ The v2 update introduces significant enhancements across the stack:
 
 - **v2 Inference API**: New optimized endpoints (`/predictions/v2/*`, `/reports/v2/*`) and an enhanced model registry (`model_hub`).
 - **Advanced Validation Framework**: Comprehensive checks for fairness, robustness, feature interactions, and clinical auditing (`src/neurosynth/validation/`).
-- **Frontend Visualization Suite**: New React components for explainability including `ClinicalReportViewer`, `CounterfactualPanel`, `RiskScoreGauge`, and `SHAPWaterfallPanel`.
+- **System Monitoring & Alerting**: Real-time observability, model drift detection, and automated alerting pipelines (`src/neurosynth/monitoring/`).
+- **Infrastructure Scaling**: Orchestration expansions using Terraform, Kubernetes deployments (`model-server.yaml`), and Prometheus/Grafana integrations.
+- **Frontend Visualization Suite**: New React components for explainability including `ClinicalReportViewer`, `LIMEExplanationPanel`, `TrajectoryChart48`, `ModelPerformanceMonitor`, and `PerformanceDashboard`.
 - **External Data Connectors**: Integrations for GNOMAD, OpenNeuro, and UK Biobank (UKBB) (`src/neurosynth/connectors/`).
 - **Calibrated Ensemble Models**: Advanced pipeline leveraging CatBoost, Extra Trees, Gradient Boosting, and a Meta-Learner (`models/ensemble_v2/`).
 - **Data Version Control**: Integrated `dvc.yaml` for tracking data pipelines and model provenance.
-- **Expanded Test Coverage**: Priority-based testing pipelines across models, inference, and validation.
+- **Expanded Test Coverage**: Priority-based testing pipelines across models, inference, validation, and monitoring.
 
 ## Tech Stack
 
@@ -91,16 +93,18 @@ The v2 update introduces significant enhancements across the stack:
 - ML: scikit-learn ensemble, PyTorch LSTM, causal model, SHAP explainability
 - Frontend: React + Vite + Tailwind + Recharts + D3 components
 - Data: PostgreSQL + JSONB model artifacts + filesystem model cache
-- Deployment: Docker Compose for local full-stack, Vercel for frontend hosting
+- Deployment: Kubernetes, Terraform, Prometheus, Grafana, Docker Compose, Vercel
 
 ## Repository Layout
 
 ```text
 backend/            FastAPI app, models, routers, Celery tasks
 frontend/           React app and clinical UI
+infrastructure/     Kubernetes manifests, Prometheus configs, Grafana dashboards
 models/             Trained model artifacts and manifest cache
-src/neurosynth/     Core data logic, connectors, and advanced validation (v2)
+src/neurosynth/     Core data logic, validation, monitoring, and connectors
 scripts/            Training and release helper scripts
+terraform/          Infrastructure as code (GPU nodes, Kafka, etc.)
 tests/              Integration and quality checks
 docker-compose.yml  Local orchestration (API, worker, DB, Redis)
 ```
