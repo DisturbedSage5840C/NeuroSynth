@@ -38,6 +38,11 @@ except ImportError:
     CatBoostClassifier = None  # type: ignore[assignment,misc]
 
 try:
+    from lightgbm import LGBMClassifier
+except ImportError:
+    LGBMClassifier = None  # type: ignore[assignment,misc]
+
+try:
     from mapie.classification import MapieClassifier
 except ImportError:
     MapieClassifier = None  # type: ignore[assignment,misc]
@@ -113,6 +118,18 @@ class CalibratedEnsemble:
             )
             logger.warning("CatBoost not available, using ExtraTrees fallback")
 
+        if LGBMClassifier is not None:
+            self.lgbm: Any = LGBMClassifier(
+                n_estimators=600, learning_rate=0.03, num_leaves=63,
+                min_child_samples=20, subsample=0.8, colsample_bytree=0.8,
+                n_jobs=-1, random_state=42, verbose=-1,
+            )
+            self._has_lgbm = True
+            logger.info("lightgbm_model_added")
+        else:
+            self.lgbm = None
+            self._has_lgbm = False
+
         # Meta-learner (trained on OOF probs)
         self.meta_learner = LogisticRegression(C=10.0, max_iter=500, random_state=42)
 
@@ -130,13 +147,16 @@ class CalibratedEnsemble:
 
     @property
     def base_models(self) -> list[tuple[str, Any]]:
-        return [
+        models = [
             ("random_forest", self.rf),
             ("gradient_boosting", self.gb),
             (self.xgb_name, self.xgb),
             ("logistic_regression", self.lr),
             ("catboost", self.catboost),
         ]
+        if self._has_lgbm and self.lgbm is not None:
+            models.append(("lightgbm", self.lgbm))
+        return models
 
     def _get_oof_predictions(
         self, X: np.ndarray, y: np.ndarray

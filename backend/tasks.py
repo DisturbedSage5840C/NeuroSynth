@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -323,15 +326,31 @@ def run_full_training_pipeline(
         "retrain_window_days": retrain_window_days,
         "requested_at": started.isoformat(),
     }
+    # Retrain by invoking the canonical train.py entry point as a subprocess. This
+    # keeps the worker decoupled from the training import graph and lets it pick up
+    # any data-source changes. Exit 0 = promoted (AUC gate passed); 2 = trained but
+    # below the gate (not promoted); anything else is a hard failure → retry.
+    repo_root = Path(__file__).resolve().parent.parent
     try:
-        from scripts.train_orchestrator import run_training  # type: ignore
-
-        result = run_training(reason=trigger_reason, window_days=retrain_window_days)
-        record["status"] = "completed"
-        record["result"] = result
-    except Exception as exc:  # orchestrator optional / training env not present
+        proc = subprocess.run(
+            [sys.executable, "train.py", "--validate"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=3500,
+        )
+        if proc.returncode in (0, 2):
+            record["status"] = "completed"
+            record["promoted"] = proc.returncode == 0
+            record["stdout_tail"] = proc.stdout[-2000:]
+        else:
+            raise RuntimeError(f"train.py exited {proc.returncode}: {proc.stderr[-2000:]}")
+    except subprocess.TimeoutExpired as exc:
+        record["status"] = "timeout"
+        raise self.retry(exc=exc)
+    except Exception as exc:  # training env not present / hard failure
         record["status"] = "accepted"
-        record["note"] = f"retrain request recorded; orchestrator not run ({exc})"
+        record["note"] = f"retrain request recorded; training not completed ({exc})"
 
     record["duration_ms"] = _mark_duration("training", started)
     return record

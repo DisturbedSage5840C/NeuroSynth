@@ -16,7 +16,7 @@ export function BiomarkerStrip({ patientId = 'P-001' }: BiomarkerStripProps) {
 
   useEffect(() => {
     const subscribe = (url: string) => {
-      const es = new EventSource(url);
+      const es = new EventSource(url, { withCredentials: true });
       esRef.current = es;
       es.onmessage = (event) => {
         const data: BiomarkerReading = JSON.parse(event.data);
@@ -63,11 +63,13 @@ export function BiomarkerStrip({ patientId = 'P-001' }: BiomarkerStripProps) {
 
   const latest = readings[readings.length - 1];
 
+  const fmt = (val: number) => Number.isInteger(val) ? String(val) : val.toFixed(1);
+
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-foreground">Real-time Wearable Biomarkers</h3>
-        <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--risk-low)' }}>
+        <span className="flex items-center gap-1 text-xs text-[var(--risk-low)]">
           <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
           LIVE
         </span>
@@ -84,7 +86,7 @@ export function BiomarkerStrip({ patientId = 'P-001' }: BiomarkerStripProps) {
                   className="font-mono text-sm font-medium"
                   style={{ color: isAbnormal ? 'var(--risk-critical)' : color }}
                 >
-                  {val}<span className="text-xs text-muted-foreground ml-0.5">{unit}</span>
+                  {fmt(val)}<span className="text-xs text-muted-foreground ml-0.5">{unit}</span>
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={60}>

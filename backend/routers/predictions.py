@@ -332,14 +332,12 @@ async def dataset_stats(request: Request, user: UserContext = Depends(get_curren
 
 
 @router.get("/model/performance")
-async def model_performance(request: Request, user: UserContext = Depends(get_current_user)):
-    _ = user
+async def model_performance(request: Request):
     return getattr(request.app.state, "metrics", {})
 
 
 @router.get("/model/feature_importance")
-async def feature_importance(request: Request, user: UserContext = Depends(get_current_user)):
-    _ = user
+async def feature_importance(request: Request):
     predictor = getattr(request.app.state, "predictor", None)
     if predictor is None:
         return {}

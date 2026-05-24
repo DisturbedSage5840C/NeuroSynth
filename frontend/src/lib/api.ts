@@ -305,7 +305,18 @@ async function liveFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok) {
-    const err: ApiError = new Error(await response.text());
+    let message: string;
+    if (response.status === 401) {
+      message = "Session expired — please sign out and sign in again.";
+    } else {
+      try {
+        const body = await response.json() as { detail?: string };
+        message = body.detail ?? response.statusText;
+      } catch {
+        message = response.statusText;
+      }
+    }
+    const err: ApiError = new Error(message);
     err.status = response.status;
     throw err;
   }

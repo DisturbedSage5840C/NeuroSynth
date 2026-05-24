@@ -1,7 +1,7 @@
 {
-  "trained_at": "2026-05-24T04:05:04.935897+00:00",
-  "dataset_path": "/Users/maruteymani/Documents/NeuroSynth/neurological_disease_data.csv",
-  "dataset_md5": "c784234996d2efea9ef063348b6baa17",
+  "trained_at": "2026-05-24T09:09:24.312478+00:00",
+  "dataset_path": "data/realistic_v4.parquet",
+  "dataset_md5": "bd46959233377180ab65ae1d75d73956",
   "feature_schema": [
     "Age",
     "Gender",
@@ -38,252 +38,252 @@
   ],
   "bootstrap_disease": "Parkinson's Disease",
   "dataset_stats": {
-    "n_patients": 4849,
-    "n_alzheimers": 2561,
-    "n_healthy": 2288,
-    "pct_alzheimers": 52.82,
-    "mean_age": 63.3009,
-    "mean_mmse": 20.9884,
+    "n_patients": 15000,
+    "n_alzheimers": 7533,
+    "n_healthy": 7467,
+    "pct_alzheimers": 50.22,
+    "mean_age": 72.0171,
+    "mean_mmse": 25.7301,
     "feature_distributions": {
       "Age": {
-        "mean": 63.3009,
-        "std": 17.8679,
-        "min": 18.0,
-        "max": 95.0
+        "mean": 72.0171,
+        "std": 8.0103,
+        "min": 45.0,
+        "max": 100.0
       },
       "Gender": {
-        "mean": 0.4879,
-        "std": 0.4999,
+        "mean": 0.5185,
+        "std": 0.4997,
         "min": 0.0,
         "max": 1.0
       },
       "Ethnicity": {
-        "mean": 1.1604,
-        "std": 1.1394,
+        "mean": 0.5377,
+        "std": 0.9313,
         "min": 0.0,
         "max": 3.0
       },
       "EducationLevel": {
-        "mean": 1.5195,
-        "std": 0.9914,
+        "mean": 1.7029,
+        "std": 0.9533,
         "min": 0.0,
         "max": 3.0
       },
       "BMI": {
-        "mean": 26.4284,
-        "std": 5.9997,
-        "min": 15.0089,
-        "max": 39.9928
+        "mean": 26.5522,
+        "std": 4.5092,
+        "min": 15.0,
+        "max": 43.3542
       },
       "Smoking": {
-        "mean": 0.2838,
-        "std": 0.4508,
+        "mean": 0.1783,
+        "std": 0.3827,
         "min": 0.0,
         "max": 1.0
       },
       "AlcoholConsumption": {
-        "mean": 5.6927,
-        "std": 5.6926,
+        "mean": 2.4809,
+        "std": 2.4434,
         "min": 0.0001,
-        "max": 19.9893
+        "max": 20.0
       },
       "PhysicalActivity": {
-        "mean": 4.6652,
-        "std": 2.5636,
+        "mean": 4.2154,
+        "std": 2.2193,
         "min": 0.0,
         "max": 10.0
       },
       "DietQuality": {
-        "mean": 5.3632,
-        "std": 2.4428,
+        "mean": 5.6152,
+        "std": 1.9625,
         "min": 0.0,
         "max": 10.0
       },
       "SleepQuality": {
-        "mean": 6.2404,
-        "std": 2.0321,
+        "mean": 5.3851,
+        "std": 2.0592,
         "min": 0.0,
         "max": 10.0
       },
       "FamilyHistoryAlzheimers": {
-        "mean": 0.1491,
-        "std": 0.3562,
+        "mean": 0.2194,
+        "std": 0.4138,
         "min": 0.0,
         "max": 1.0
       },
       "CardiovascularDisease": {
-        "mean": 0.1778,
-        "std": 0.3823,
+        "mean": 0.2802,
+        "std": 0.4491,
         "min": 0.0,
         "max": 1.0
       },
       "Diabetes": {
-        "mean": 0.1402,
-        "std": 0.3472,
+        "mean": 0.1772,
+        "std": 0.3818,
         "min": 0.0,
         "max": 1.0
       },
       "Depression": {
-        "mean": 0.3527,
-        "std": 0.4778,
+        "mean": 0.3041,
+        "std": 0.46,
         "min": 0.0,
         "max": 1.0
       },
       "HeadInjury": {
-        "mean": 0.112,
-        "std": 0.3153,
+        "mean": 0.1236,
+        "std": 0.3291,
         "min": 0.0,
         "max": 1.0
       },
       "Hypertension": {
-        "mean": 0.2186,
-        "std": 0.4133,
+        "mean": 0.4178,
+        "std": 0.4932,
         "min": 0.0,
         "max": 1.0
       },
       "SystolicBP": {
-        "mean": 127.4835,
-        "std": 22.4674,
-        "min": 85.0,
-        "max": 192.851
+        "mean": 131.9038,
+        "std": 16.8517,
+        "min": 80.0,
+        "max": 194.5293
       },
       "DiastolicBP": {
-        "mean": 82.8122,
-        "std": 15.5972,
-        "min": 45.0,
-        "max": 119.7249
+        "mean": 80.1504,
+        "std": 10.9861,
+        "min": 40.0,
+        "max": 119.6612
       },
       "CholesterolTotal": {
-        "mean": 205.0028,
-        "std": 40.8598,
-        "min": 110.0,
-        "max": 299.9934
+        "mean": 199.6231,
+        "std": 34.1036,
+        "min": 100.0,
+        "max": 331.3728
       },
       "CholesterolLDL": {
-        "mean": 118.1465,
-        "std": 35.2397,
-        "min": 45.0,
-        "max": 203.0719
+        "mean": 119.8881,
+        "std": 29.8787,
+        "min": 40.0,
+        "max": 246.581
       },
       "CholesterolHDL": {
-        "mean": 57.5514,
-        "std": 19.0312,
-        "min": 20.0034,
-        "max": 114.3528
+        "mean": 54.075,
+        "std": 13.9225,
+        "min": 20.0,
+        "max": 105.4769
       },
       "CholesterolTriglycerides": {
-        "mean": 176.6856,
-        "std": 90.515,
-        "min": 42.0,
-        "max": 399.9419
+        "mean": 148.8126,
+        "std": 56.2029,
+        "min": 40.0,
+        "max": 367.4799
       },
       "MMSE": {
-        "mean": 20.9884,
-        "std": 8.3026,
-        "min": 0.0053,
+        "mean": 25.7301,
+        "std": 3.2088,
+        "min": 11.6107,
         "max": 30.0
       },
       "FunctionalAssessment": {
-        "mean": 5.7532,
-        "std": 2.5533,
+        "mean": 5.955,
+        "std": 2.2171,
         "min": 0.0,
         "max": 10.0
       },
       "MemoryComplaints": {
-        "mean": 0.2718,
-        "std": 0.4449,
+        "mean": 0.3421,
+        "std": 0.4744,
         "min": 0.0,
         "max": 1.0
       },
       "BehavioralProblems": {
-        "mean": 0.2413,
-        "std": 0.4279,
+        "mean": 0.2149,
+        "std": 0.4107,
         "min": 0.0,
         "max": 1.0
       },
       "ADL": {
-        "mean": 5.7912,
-        "std": 2.6058,
+        "mean": 6.2725,
+        "std": 2.1791,
         "min": 0.0,
         "max": 10.0
       },
       "Confusion": {
-        "mean": 0.1972,
-        "std": 0.3978,
+        "mean": 0.1863,
+        "std": 0.3894,
         "min": 0.0,
         "max": 1.0
       },
       "Disorientation": {
-        "mean": 0.1514,
-        "std": 0.3584,
+        "mean": 0.1365,
+        "std": 0.3433,
         "min": 0.0,
         "max": 1.0
       },
       "PersonalityChanges": {
-        "mean": 0.2596,
-        "std": 0.4384,
+        "mean": 0.2012,
+        "std": 0.4009,
         "min": 0.0,
         "max": 1.0
       },
       "DifficultyCompletingTasks": {
-        "mean": 0.3531,
-        "std": 0.4779,
+        "mean": 0.2956,
+        "std": 0.4563,
         "min": 0.0,
         "max": 1.0
       },
       "Forgetfulness": {
-        "mean": 0.3215,
-        "std": 0.4671,
+        "mean": 0.4071,
+        "std": 0.4913,
         "min": 0.0,
         "max": 1.0
       }
     },
-    "source_n_patients": 4849,
+    "source_n_patients": 15000,
     "training_cohort": "full_dataset"
   },
   "metrics": {
-    "accuracy": 0.7691,
-    "f1_weighted": 0.7631,
-    "roc_auc": 0.8182,
-    "precision": 0.725,
-    "recall": 0.9062,
+    "accuracy": 0.8603,
+    "f1_weighted": 0.8603,
+    "roc_auc": 0.9408,
+    "precision": 0.8711,
+    "recall": 0.8474,
     "confusion_matrix": [
       [
-        282,
-        176
+        1304,
+        189
       ],
       [
-        48,
-        464
+        230,
+        1277
       ]
     ],
     "classification_report": {
       "0": {
-        "precision": 0.8545454545454545,
-        "recall": 0.6157205240174672,
-        "f1-score": 0.7157360406091371,
-        "support": 458.0
+        "precision": 0.8500651890482399,
+        "recall": 0.8734092431346283,
+        "f1-score": 0.861579121242154,
+        "support": 1493.0
       },
       "1": {
-        "precision": 0.725,
-        "recall": 0.90625,
-        "f1-score": 0.8055555555555556,
-        "support": 512.0
+        "precision": 0.8710777626193724,
+        "recall": 0.847378898473789,
+        "f1-score": 0.8590649175916583,
+        "support": 1507.0
       },
-      "accuracy": 0.7690721649484537,
+      "accuracy": 0.8603333333333333,
       "macro avg": {
-        "precision": 0.7897727272727273,
-        "recall": 0.7609852620087336,
-        "f1-score": 0.7606457980823463,
-        "support": 970.0
+        "precision": 0.8605714758338061,
+        "recall": 0.8603940708042086,
+        "f1-score": 0.8603220194169061,
+        "support": 3000.0
       },
       "weighted avg": {
-        "precision": 0.7861668228678537,
-        "recall": 0.7690721649484537,
-        "f1-score": 0.7631459289107518,
-        "support": 970.0
+        "precision": 0.8606205051721388,
+        "recall": 0.8603333333333333,
+        "f1-score": 0.8603161529417216,
+        "support": 3000.0
       }
     },
-    "decision_threshold": 0.5
+    "decision_threshold": 0.49
   }
 }

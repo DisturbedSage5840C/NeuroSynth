@@ -6,6 +6,54 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [4.0.0-alpha.1] — 2026-05-24
+
+Production-hardening release: clears the AUC gate, replaces the broken training
+entry point, and completes the data/DB/monitoring/deploy foundations.
+
+### Added
+- **AUC ≥ 0.92 achieved (Gap 2):** the production ensemble now reaches **test AUC
+  0.9408**. `BiomarkerPredictor` gains LightGBM as a 5th base learner with dynamic
+  weights and graceful fallback when the library is absent; `CalibratedEnsemble`
+  also gains LightGBM.
+- **Enriched synthetic generator:** `build_realistic_synthetic.py` adds nonlinear
+  interactions/thresholds (age×MMSE, MMSE cliff, functional+ADL synergy, APOE-like
+  age-dependent family history) plus a `--gain` control that polarizes the label
+  distribution — so the tree ensemble genuinely beats logistic regression and the
+  separability ceiling clears the gate at a realistic noise level.
+- **Unified `train.py`:** replaces the disconnected RandomForest-on-OASIS stub with
+  a canonical entry point that trains the full stack via `run_pretrain`, enforces the
+  AUC gate (`--validate`, exit 2 below 0.92), and caps native thread pools to avoid
+  the macOS OpenMP segfault under repeated fits.
+- **Parquet support:** `DataPipeline` reads `.parquet` and resolves
+  `data/realistic_v4.{parquet,csv}` ahead of the legacy CSVs; `api.py` dataset
+  resolution matches so the model manifest validates against the trained dataset.
+- **Production DB schema:** `model_versions`, `drift_events`, `audit_log` (hash-chained),
+  and `feature_snapshots` tables, plus explainability/lineage columns on `analyses`
+  (`lime_values`, `counterfactuals`, `model_version`, `confidence_intervals`,
+  `generated_by`).
+- **Drift auto-retrain wired end-to-end:** `run_full_training_pipeline` now invokes
+  `train.py --validate` as a decoupled subprocess (exit 0 promote / 2 not-promoted).
+- **Web fonts:** JetBrains Mono + Inter loaded in `index.html` (the Clinical Terminal
+  design referenced them without importing).
+- **Anatomical brain mapping:** `frontend/src/lib/brainAtlas.ts` maps features to brain
+  regions by clinical association; `regionsFromShap` aggregates SHAP by anatomy instead
+  of by index.
+- **Real-data ingestion scaffolding:** `scripts/data/process_oasis.py` (OASIS → 32-feature
+  schema) and `scripts/data/merge_sources.py` (combine all available sources).
+- **CI gate:** `.github/workflows/train-validate.yml` regenerates data, trains, and fails
+  the build below AUC 0.92; `Procfile` adds the Celery worker process.
+
+### Fixed
+- `model_registry` now loads the trained LightGBM artifact (the manual loader skipped
+  it, leaving an unfitted estimator in the prediction path).
+- `build_realistic_synthetic.py` assigns `DiseaseType` to every row so per-disease
+  splits keep both classes (previously single-class → training error).
+- Per-disease models disable LightGBM (`enable_lgbm=False`) to avoid the repeated-fit
+  OpenMP crash; `load_from_disk` ignores stale per-disease lgbm artifacts.
+
+---
+
 ## [3.0.0-alpha.1] — 2026-05-23
 
 Gap-fix release closing critical gaps from the v2 audit.

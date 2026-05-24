@@ -13,6 +13,7 @@ import { Canvas } from "@react-three/fiber";
 import { Html, OrbitControls } from "@react-three/drei";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { mapFeatureToRegion } from "@/lib/brainAtlas";
 
 export interface BrainRegion {
   id: string;
@@ -53,14 +54,24 @@ function colorForShap(v: number): THREE.Color {
   return new THREE.Color("#4b5563");
 }
 
-/** Map a SHAP value list onto anatomical regions (by descending magnitude). */
+/** Aggregate SHAP contributions onto anatomical regions via the clinical atlas. */
 export function regionsFromShap(shapValues: SHAPValue[]): BrainRegion[] {
-  const sorted = [...shapValues].sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
-  return REGION_LAYOUT.map((r, i) => ({
-    ...r,
-    shapValue: sorted[i]?.value ?? 0,
-    name: sorted[i] ? `${r.name} · ${sorted[i].feature}` : r.name,
-  }));
+  const agg = new Map<string, { total: number; features: string[] }>();
+  for (const sv of shapValues) {
+    const regionId = mapFeatureToRegion(sv.feature);
+    const entry = agg.get(regionId) ?? { total: 0, features: [] };
+    entry.total += sv.value;
+    entry.features.push(sv.feature);
+    agg.set(regionId, entry);
+  }
+  return REGION_LAYOUT.map((r) => {
+    const entry = agg.get(r.id);
+    return {
+      ...r,
+      shapValue: entry?.total ?? 0,
+      name: entry?.features.length ? `${r.name} · ${entry.features.slice(0, 2).join(", ")}` : r.name,
+    };
+  });
 }
 
 function RegionMesh({ region }: { region: BrainRegion }) {

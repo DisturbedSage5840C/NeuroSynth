@@ -16,12 +16,21 @@ class DataPipeline:
     drop_columns = ["PatientID", "DoctorInCharge"]
     categorical_columns = ["Gender", "Ethnicity", "EducationLevel", "DiseaseType"]
 
+    # Resolution order when no explicit path is given: the realistic v4 synthetic
+    # set (parquet preferred, csv fallback) takes priority, then the legacy CSVs.
+    DATA_CANDIDATES = (
+        "data/realistic_v4.parquet",
+        "data/realistic_v4.csv",
+        "neurological_disease_data.csv",
+        "alzheimers_disease_data.csv",
+    )
+
     def __init__(self, csv_path: str | None = None, models_dir: str | Path = "models") -> None:
         if csv_path is None:
-            if Path("neurological_disease_data.csv").exists():
-                csv_path = "neurological_disease_data.csv"
-            else:
-                csv_path = "alzheimers_disease_data.csv"
+            csv_path = next(
+                (c for c in self.DATA_CANDIDATES if Path(c).exists()),
+                "alzheimers_disease_data.csv",
+            )
         self.csv_path = Path(csv_path)
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(parents=True, exist_ok=True)
@@ -35,8 +44,11 @@ class DataPipeline:
     def _load(self) -> pd.DataFrame:
         if not self.csv_path.exists():
             raise FileNotFoundError(
-                f"Dataset not found: {self.csv_path}. Place alzheimers_disease_data.csv in repo root."
+                f"Dataset not found: {self.csv_path}. "
+                "Run: python scripts/data/build_realistic_synthetic.py"
             )
+        if self.csv_path.suffix == ".parquet":
+            return pd.read_parquet(self.csv_path)
         return pd.read_csv(self.csv_path)
 
     @staticmethod

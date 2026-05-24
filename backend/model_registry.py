@@ -48,6 +48,17 @@ class ModelRegistry:
         if lr_model.exists():
             predictor.lr = joblib.load(lr_model)
 
+        # Load the trained LightGBM 5th model if present; otherwise drop it so the
+        # ensemble runs as the 4-model variant (keeps __init__'s fresh, unfitted
+        # lgbm out of the prediction path).
+        lgbm_model = self.models_dir / "lgbm_model.pkl"
+        if predictor.has_lgbm and lgbm_model.exists():
+            predictor.lgbm = joblib.load(lgbm_model)
+        else:
+            predictor.lgbm = None
+            predictor.has_lgbm = False
+        predictor._refresh_weights()
+
         temporal = TemporalProgressionModel(feature_names)
         lstm_state = torch.load(
             self.models_dir / "lstm_model.pt",

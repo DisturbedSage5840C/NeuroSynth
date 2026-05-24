@@ -32,9 +32,16 @@ from backend.routers import admin, auth, biomarkers, causal, features, health, p
 
 
 def _dataset_path() -> Path:
-    candidate = Path("neurological_disease_data.csv")
-    if candidate.exists():
-        return candidate
+    # Must match backend.data_pipeline.DataPipeline.DATA_CANDIDATES so the manifest
+    # MD5 check validates against the same dataset training wrote artifacts from.
+    for candidate in (
+        "data/realistic_v4.parquet",
+        "data/realistic_v4.csv",
+        "neurological_disease_data.csv",
+        "alzheimers_disease_data.csv",
+    ):
+        if Path(candidate).exists():
+            return Path(candidate)
     return Path("alzheimers_disease_data.csv")
 
 

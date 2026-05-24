@@ -24,16 +24,30 @@ except Exception:
     XGBClassifier = None
 
 try:
+    from lightgbm import LGBMClassifier
+except Exception:
+    LGBMClassifier = None
+
+try:
     import shap  # type: ignore
 except Exception:
     shap = None
 
 
 class BiomarkerPredictor:
-    def __init__(self, feature_names: list[str], models_dir: str | Path = "models") -> None:
+    def __init__(
+        self,
+        feature_names: list[str],
+        models_dir: str | Path = "models",
+        enable_lgbm: bool = True,
+    ) -> None:
         self.feature_names = feature_names
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(parents=True, exist_ok=True)
+        # enable_lgbm=False is used for the per-disease models: training LightGBM
+        # repeatedly in one process alongside torch segfaults on macOS (clashing
+        # OpenMP runtimes). The main predictor keeps it for the AUC headroom.
+        self._enable_lgbm = enable_lgbm
 
         self.rf = RandomForestClassifier(
             n_estimators=500,
@@ -70,9 +84,43 @@ class BiomarkerPredictor:
             self.third_name = "extra_trees"
 
         self.lr = LogisticRegression(C=1.0, max_iter=1000, class_weight="balanced", random_state=42)
-        self.weights = np.array([0.35, 0.35, 0.20, 0.10], dtype=float)
+
+        # LightGBM as an optional 5th base learner — strongest single-model AUC on
+        # tabular clinical data, which is what lifts the ensemble past the 0.92 gate.
+        if LGBMClassifier is not None and enable_lgbm:
+            # n_jobs=1: this predictor is trained repeatedly in one process (main +
+            # one per disease), and LightGBM's OpenMP pool deadlocks under repeated
+            # fits on macOS. Single-threaded is sub-second on this data anyway.
+            self.lgbm = LGBMClassifier(
+                n_estimators=600,
+                learning_rate=0.03,
+                num_leaves=63,
+                min_child_samples=20,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                n_jobs=1,
+                random_state=42,
+                verbose=-1,
+            )
+            self.has_lgbm = True
+        else:
+            self.lgbm = None
+            self.has_lgbm = False
+
         self.tree_explainer: Any | None = None
         self.decision_threshold: float = 0.5
+        self._refresh_weights()
+
+    def _refresh_weights(self) -> None:
+        """Set ensemble weights for the currently-active base models.
+
+        Order: [rf, gb, third, lr] plus lgbm when present. Tree learners carry
+        more weight than the linear model; lgbm shares the top tier with rf/gb.
+        """
+        if self.has_lgbm and self.lgbm is not None:
+            self.weights = np.array([0.24, 0.24, 0.18, 0.10, 0.24], dtype=float)
+        else:
+            self.weights = np.array([0.35, 0.35, 0.20, 0.10], dtype=float)
 
     def load_from_disk(self) -> None:
         self.rf = joblib.load(self.models_dir / "rf_model.pkl")
@@ -103,6 +151,18 @@ class BiomarkerPredictor:
         if lr_path.exists():
             self.lr = joblib.load(lr_path)
 
+        # LightGBM participates only if enabled for this predictor AND both the
+        # library and a trained artifact exist (guards against stale per-disease
+        # lgbm artifacts left by older runs).
+        lgbm_path = self.models_dir / "lgbm_model.pkl"
+        if self._enable_lgbm and LGBMClassifier is not None and lgbm_path.exists():
+            self.lgbm = joblib.load(lgbm_path)
+            self.has_lgbm = True
+        else:
+            self.lgbm = None
+            self.has_lgbm = False
+        self._refresh_weights()
+
         threshold_path = self.models_dir / "decision_threshold.pkl"
         if threshold_path.exists():
             self.decision_threshold = float(joblib.load(threshold_path))
@@ -131,6 +191,8 @@ class BiomarkerPredictor:
         self.gb.fit(X_train, y_train)
         self.third.fit(X_train, y_train)
         self.lr.fit(X_train, y_train)
+        if self.has_lgbm and self.lgbm is not None:
+            self.lgbm.fit(X_train, y_train)
 
         if shap is not None:
             self.tree_explainer = shap.TreeExplainer(self.rf)
@@ -151,6 +213,8 @@ class BiomarkerPredictor:
         joblib.dump(self.gb, self.models_dir / "gb_model.pkl")
         joblib.dump(self.third, self.models_dir / f"{self.third_name}_model.pkl")
         joblib.dump(self.lr, self.models_dir / "lr_model.pkl")
+        if self.has_lgbm and self.lgbm is not None:
+            joblib.dump(self.lgbm, self.models_dir / "lgbm_model.pkl")
         joblib.dump(self.decision_threshold, self.models_dir / "decision_threshold.pkl")
 
     def _ensemble_probs(self, X: np.ndarray) -> tuple[np.ndarray, dict[str, np.ndarray]]:
@@ -159,14 +223,20 @@ class BiomarkerPredictor:
         third_p = self.third.predict_proba(X)[:, 1]
         lr_p = self.lr.predict_proba(X)[:, 1]
 
-        stacked = np.vstack([rf_p, gb_p, third_p, lr_p])
-        ensemble = np.average(stacked, axis=0, weights=self.weights)
+        columns = [rf_p, gb_p, third_p, lr_p]
         per_model = {
             "random_forest": rf_p,
             "gradient_boosting": gb_p,
             self.third_name: third_p,
             "logistic_regression": lr_p,
         }
+        if self.has_lgbm and self.lgbm is not None:
+            lgbm_p = self.lgbm.predict_proba(X)[:, 1]
+            columns.append(lgbm_p)
+            per_model["lightgbm"] = lgbm_p
+
+        stacked = np.vstack(columns)
+        ensemble = np.average(stacked, axis=0, weights=self.weights)
         return ensemble, per_model
 
     def get_shap_values(self, X: np.ndarray) -> np.ndarray:
@@ -212,9 +282,16 @@ class BiomarkerPredictor:
 
     def get_feature_importance(self) -> dict[str, float]:
         importances = []
-        for model in [self.rf, self.gb, self.third]:
+        tree_models = [self.rf, self.gb, self.third]
+        if self.has_lgbm and self.lgbm is not None:
+            tree_models.append(self.lgbm)
+        for model in tree_models:
             if hasattr(model, "feature_importances_"):
-                importances.append(np.asarray(model.feature_importances_, dtype=float))
+                imp = np.asarray(model.feature_importances_, dtype=float)
+                total = imp.sum()
+                if total > 0:  # lgbm uses raw split counts; normalize so scales match
+                    imp = imp / total
+                importances.append(imp)
         if not importances:
             return {name: 0.0 for name in self.feature_names}
 
@@ -253,7 +330,11 @@ class MultiDiseasePredictor:
         for disease in diseases:
             disease_dir = self.models_dir / self._slug(disease)
             disease_dir.mkdir(parents=True, exist_ok=True)
-            self.predictors[disease] = BiomarkerPredictor(feature_names=feature_names, models_dir=disease_dir)
+            # enable_lgbm=False: avoids the repeated-LightGBM OpenMP segfault on macOS
+            # (the 4-model ensemble is sufficient for secondary per-disease scores).
+            self.predictors[disease] = BiomarkerPredictor(
+                feature_names=feature_names, models_dir=disease_dir, enable_lgbm=False
+            )
 
     @staticmethod
     def _slug(name: str) -> str:

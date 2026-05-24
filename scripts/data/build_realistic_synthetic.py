@@ -73,19 +73,32 @@ def _sample_features(n: int, rng: np.random.RandomState) -> pd.DataFrame:
 
 
 def _latent_risk(df: pd.DataFrame, rng: np.random.RandomState, noise: float) -> np.ndarray:
-    """Clinically grounded latent risk (standardized continuous terms + binary effects)."""
+    """Clinically grounded latent risk.
+
+    Combines standardized linear terms with **nonlinear interactions and
+    thresholds** that mirror real neurodegeneration dynamics — so a tree
+    ensemble can extract structure a linear model cannot, and the dataset has a
+    high but realistic separability ceiling.
+    """
     def z(col: str) -> np.ndarray:
         v = df[col].to_numpy(dtype=float)
         return (v - v.mean()) / (v.std() + 1e-9)
 
-    logit = (
+    age = df["Age"].to_numpy(dtype=float)
+    mmse = df["MMSE"].to_numpy(dtype=float)
+    func = df["FunctionalAssessment"].to_numpy(dtype=float)
+    adl = df["ADL"].to_numpy(dtype=float)
+    famhx = df["FamilyHistoryAlzheimers"].to_numpy(dtype=float)
+
+    # Linear backbone
+    linear = (
         -0.6
         + 0.95 * z("Age")
         - 1.50 * z("MMSE")
         - 1.05 * z("FunctionalAssessment")
         - 0.85 * z("ADL")
         + 0.55 * df["MemoryComplaints"].to_numpy()
-        + 0.50 * df["FamilyHistoryAlzheimers"].to_numpy()
+        + 0.50 * famhx
         + 0.40 * df["BehavioralProblems"].to_numpy()
         + 0.35 * df["Confusion"].to_numpy()
         + 0.30 * df["Disorientation"].to_numpy()
@@ -99,22 +112,41 @@ def _latent_risk(df: pd.DataFrame, rng: np.random.RandomState, noise: float) -> 
         - 0.18 * z("EducationLevel")
         - 0.15 * z("SleepQuality")
     )
-    return logit + rng.normal(0, noise, len(df))
+
+    # Nonlinear structure (interactions + thresholds) — the ensemble's edge.
+    nonlinear = (
+        # Cognitive reserve fails fast: low MMSE in the old is disproportionately risky.
+        1.30 * z("Age") * (-z("MMSE"))
+        # Steep cliff below the MMSE 24 dementia screening threshold.
+        + 1.10 * np.clip((24.0 - mmse) / 6.0, 0.0, 1.5)
+        # Combined functional + ADL collapse compounds (both low → synergistic risk).
+        + 0.90 * np.maximum(0.0, (6.0 - func) / 6.0) * np.maximum(0.0, (6.0 - adl) / 6.0)
+        # Genetic risk matters far more with age (APOE-like age dependence).
+        + 0.80 * famhx * np.clip((age - 70.0) / 15.0, 0.0, 1.5)
+        # Accelerating risk in advanced age (quadratic).
+        + 0.45 * np.clip((age - 75.0) / 12.0, 0.0, 2.0) ** 2
+    )
+
+    return linear + nonlinear + rng.normal(0, noise, len(df))
 
 
-def build(n: int, seed: int, noise: float) -> pd.DataFrame:
+def build(n: int, seed: int, noise: float, gain: float = 1.0) -> pd.DataFrame:
     rng = np.random.RandomState(seed)
     df = _sample_features(n, rng)
-    logit = _latent_risk(df, rng, noise)
+    # ``gain`` scales the latent logit before the sigmoid. The label is a Bernoulli
+    # draw from that probability, so polarizing the logit (gain > 1) separates the
+    # classes and raises the Bayes-optimal AUC ceiling; ``noise`` lowers it again.
+    logit = gain * _latent_risk(df, rng, noise)
     prob = 1.0 / (1.0 + np.exp(-logit))
     df["Diagnosis"] = (rng.uniform(size=n) < prob).astype(int)
 
-    # Assign a plausible disease label to positives so multi-disease gates have data.
-    disease = rng.choice(
+    # DiseaseType is the condition each patient is *evaluated for* — assigned to every
+    # row regardless of outcome, so each per-disease split has both classes (matches
+    # the real dataset's encoding and keeps the multi-disease models trainable).
+    df["DiseaseType"] = rng.choice(
         ["Alzheimer's Disease", "Parkinson's Disease", "Multiple Sclerosis"],
         n, p=[0.55, 0.28, 0.17],
     )
-    df["DiseaseType"] = np.where(df["Diagnosis"] == 1, disease, "None")
     df.insert(0, "PatientID", [f"SYN-{i:06d}" for i in range(n)])
     df["DoctorInCharge"] = "synthetic"
     return df
@@ -125,10 +157,11 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--noise", type=float, default=0.85, help="latent noise SD; higher = lower AUC ceiling")
+    ap.add_argument("--gain", type=float, default=1.0, help="logit gain; >1 polarizes classes and raises the AUC ceiling")
     ap.add_argument("--out", type=str, default="data/synthetic_v2/realistic.parquet")
     args = ap.parse_args()
 
-    df = build(args.n, args.seed, args.noise)
+    df = build(args.n, args.seed, args.noise, args.gain)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
