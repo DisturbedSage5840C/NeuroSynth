@@ -41,6 +41,9 @@ services:
       - NEUROSYNTH_REDIS_URL=redis://redis:6379/0
       - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
     volumes:
+      # Mount the whole data dir so the container sees data/realistic_v4.parquet
+      # (the v4 training set); the legacy CSV stays as the fallback.
+      - ./data:/app/data
       - ./neurological_disease_data.csv:/app/neurological_disease_data.csv
       - ./models:/app/models
     depends_on:
@@ -60,6 +63,9 @@ services:
       - NEUROSYNTH_POSTGRES_DSN=postgresql://postgres:postgres@postgres:5432/neurosynth
       - NEUROSYNTH_REDIS_URL=redis://redis:6379/0
     volumes:
+      # Mount the whole data dir so the container sees data/realistic_v4.parquet
+      # (the v4 training set); the legacy CSV stays as the fallback.
+      - ./data:/app/data
       - ./neurological_disease_data.csv:/app/neurological_disease_data.csv
       - ./models:/app/models
     depends_on:

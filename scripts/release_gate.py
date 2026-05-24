@@ -22,14 +22,16 @@ FORBIDDEN_SRC_MARKERS = [
     "PLACEHOLDER",
 ]
 
+# The real production env contract enforced by backend/core/config.py (env prefix
+# NEUROSYNTH_). Previously these used a stale NEURO_ prefix that matched nothing in
+# the config, so the gate passed vacuously and gave no coverage.
 REQUIRED_PROD_ENV_KEYS = [
-    "NEURO_JWKS_URL",
-    "NEURO_ALLOWED_ORIGINS",
-    "NEURO_REDIS_URL",
-    "NEURO_TIMESCALE_DSN",
-    "NEURO_ENTREZ_EMAIL",
-    "NEURO_KFP_HOST",
-    "NEURO_KFP_EXPERIMENT",
+    "NEUROSYNTH_APP_ENV",
+    "NEUROSYNTH_JWT_SECRET",
+    "NEUROSYNTH_PATIENT_HASH_SECRET",
+    "NEUROSYNTH_POSTGRES_DSN",
+    "NEUROSYNTH_REDIS_URL",
+    "NEUROSYNTH_ALLOWED_ORIGINS",
     "AWS_REGION",
     "AWS_ACCOUNT_ID",
     "ECR_REPOSITORY",
@@ -94,9 +96,9 @@ def main() -> int:
     report["checks"]["src_todo_placeholder_scan"] = {"ok": len(src_markers) == 0, "issues": src_markers}
 
     required_env = [
-        "NEURO_JWKS_URL",
-        "NEURO_ALLOWED_ORIGINS",
-        "NEURO_REDIS_URL",
+        "NEUROSYNTH_JWT_SECRET",
+        "NEUROSYNTH_ALLOWED_ORIGINS",
+        "NEUROSYNTH_REDIS_URL",
     ]
     missing = [v for v in required_env if not os.getenv(v)]
     report["checks"]["required_env"] = {"ok": len(missing) == 0, "missing": missing}

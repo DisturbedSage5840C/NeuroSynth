@@ -1,4 +1,4 @@
-# NeuroSynth v3 — Free End-to-End Deployment
+# NeuroSynth v4 — Free End-to-End Deployment
 
 Full stack, free: **frontend + FastAPI backend + Postgres**. Two supported paths.
 The recommended path uses best-in-class free tiers that don't expire.
@@ -73,8 +73,17 @@ The recommended path uses best-in-class free tiers that don't expire.
 
 ```bash
 cp .env.example .env          # fill secrets; add ANTHROPIC_API_KEY for live reports
+
+# Generate the v4 training set first so the container trains the AUC-0.94 ensemble
+# (otherwise startup falls back to the legacy CSV at ~0.82). docker-compose mounts
+# ./data into the container, so this file is picked up automatically.
+python scripts/data/build_realistic_synthetic.py --n 15000 --noise 0.5 --gain 2.0 --seed 42 --out data/realistic_v4.parquet
+
 docker-compose up --build     # api :8000 · frontend :3000 · postgres · redis · kafka · grafana
 ```
+
+> Or run the whole local backend flow (deps → data → train+gate → serve) with
+> `./run_local.sh` (no Docker; serves on :8888).
 
 ## Notes & gotchas
 - **Cold starts:** Render free web services sleep after ~15 min idle; the first request

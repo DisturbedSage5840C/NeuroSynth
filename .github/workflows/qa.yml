@@ -34,9 +34,9 @@ jobs:
 
       - name: Run release gate checks
         env:
-          NEURO_JWKS_URL: https://auth.test.local/.well-known/jwks.json
-          NEURO_ALLOWED_ORIGINS: https://api.test.local
-          NEURO_REDIS_URL: redis://localhost:6379/0
+          NEUROSYNTH_JWT_SECRET: ci-release-gate-secret-not-for-prod
+          NEUROSYNTH_ALLOWED_ORIGINS: https://api.test.local
+          NEUROSYNTH_REDIS_URL: redis://localhost:6379/0
         run: python scripts/release_gate.py
 
       - name: Run unit and integration tests (fast subset)

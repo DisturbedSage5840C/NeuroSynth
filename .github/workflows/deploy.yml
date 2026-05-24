@@ -50,11 +50,9 @@ jobs:
 
       - name: Release gate
         env:
-          NEURO_HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          NEURO_TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-          NEURO_JWKS_URL: https://example.com/.well-known/jwks.json
-          NEURO_ALLOWED_ORIGINS: http://localhost:5173
-          NEURO_REDIS_URL: redis://localhost:6379/0
+          NEUROSYNTH_JWT_SECRET: ci-release-gate-secret-not-for-prod
+          NEUROSYNTH_ALLOWED_ORIGINS: http://localhost:5173
+          NEUROSYNTH_REDIS_URL: redis://localhost:6379/0
         run: python scripts/release_gate.py
 
       - name: Build container image (local for scan)
@@ -113,11 +111,9 @@ jobs:
 
       - name: Release gate
         env:
-          NEURO_HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          NEURO_TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
-          NEURO_JWKS_URL: https://example.com/.well-known/jwks.json
-          NEURO_ALLOWED_ORIGINS: http://localhost:5173
-          NEURO_REDIS_URL: redis://localhost:6379/0
+          NEUROSYNTH_JWT_SECRET: ci-release-gate-secret-not-for-prod
+          NEUROSYNTH_ALLOWED_ORIGINS: http://localhost:5173
+          NEUROSYNTH_REDIS_URL: redis://localhost:6379/0
         run: python scripts/release_gate.py
 
       - name: Build container image (local for scan)
