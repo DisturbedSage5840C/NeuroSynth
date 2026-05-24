@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [3.0.0-alpha.1] — 2026-05-23
+
+Gap-fix release closing critical gaps from the v2 audit.
+
+### Added
+- **LLM clinical reports (Gap 4):** `ClinicalReportGeneratorV3` calls Claude
+  (`claude-sonnet-4-6`) for the SOAP narrative with a hallucination guard that verifies
+  every stated risk percentage against the inference payload; falls back to the
+  deterministic Jinja2 template when `ANTHROPIC_API_KEY` is unset or the call fails.
+- **Feature schema (Gap 7):** `backend/feature_schema.py` + `GET /v2/features/schema`
+  (human-readable labels, units, categorical encodings), a bundled frontend mirror
+  (`featureSchema.ts`), and a `FeatureLegend` component wired into the SHAP panel so
+  encoded values (Gender 0/1/2, …) are explained. SHAP bars now show human labels.
+- **3D brain (Gap 5):** `BrainVisualization3D` (Three.js / react-three-fiber) —
+  procedural anatomical brain colored by SHAP, orbit + hover tooltips, lazy-loaded
+  (code-split) and rendered in the dashboard after analysis.
+- **Clinical Intelligence Terminal design (Gap 6):** dark, monospace, data-dense
+  landing/login replacing the glassmorphism/orb aesthetic; segmented role control.
+- **Realistic synthetic data (Gap 1):** `scripts/data/build_realistic_synthetic.py`
+  derives the diagnosis label from a clinically grounded latent risk function, giving
+  a genuinely learnable signal (LR holdout AUC ≈ 0.87).
+- **Auto-retrain (monitoring):** `DriftDetector.trigger_retrain` /
+  `detect_and_maybe_retrain` dispatch the new `run_full_training_pipeline` Celery task
+  by name on CRITICAL drift; degrades to logging when the broker is unavailable.
+- **Free full-stack deployment:** `render.yaml` Blueprint (API + static frontend +
+  Postgres), slim `backend/requirements-deploy.txt`, `Procfile`, and `DEPLOYMENT.md`
+  (Vercel + Render + Neon path). Schema auto-applies on startup (`Database.apply_schema`).
+
+### Changed
+- **Validation gates (Gap 2):** hard AUC gate raised to **0.92**; new opt-in
+  per-disease floor gate (0.88) via `evaluate(..., per_disease_auc=...)`.
+
+### Notes
+- Ensemble retraining to AUC ≥ 0.92 and real ADNI/PPMI ingestion require clinical-data
+  credentials + GPU compute and are out of scope for this release.
+
 ## [2.0.0-alpha.9] — 2026-05-16
 
 ### 🏗️ Infrastructure (Priority 9)

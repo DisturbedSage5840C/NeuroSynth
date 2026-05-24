@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +24,14 @@ class Settings(BaseSettings):
 
     postgres_dsn: str = "postgresql://postgres:postgres@localhost:5432/neurosynth"
     redis_url: str = "redis://localhost:6379/0"
+
+    # LLM clinical report generation (Gap 4). Empty key -> deterministic Jinja2 fallback.
+    # Accepts the prefixed NEUROSYNTH_ANTHROPIC_API_KEY or the bare ANTHROPIC_API_KEY.
+    anthropic_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("NEUROSYNTH_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
+    )
+    anthropic_model: str = "claude-sonnet-4-6"
 
     kubeflow_host: str = "http://localhost:8080"
 

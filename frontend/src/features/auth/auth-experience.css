@@ -1,171 +1,274 @@
-.ns-landing,
-.ns-login-page {
+/*
+ * Clinical Intelligence Terminal — auth experience (Gap 6).
+ * Replaces the previous glassmorphism / floating-orb landing with a stark,
+ * dark, data-dense terminal aesthetic. Monospace data, no decorative animation.
+ */
+
+:root {
+  --ns-bg: #0b0e14;
+  --ns-surface: #141820;
+  --ns-surface-2: #1c2330;
+  --ns-border: rgba(255, 255, 255, 0.08);
+  --ns-border-strong: rgba(255, 255, 255, 0.16);
+  --ns-text: #e2e8f0;
+  --ns-text-2: #94a3b8;
+  --ns-text-3: #64748b;
+  --ns-accent: #00d4aa;
+  --ns-danger: #ef4444;
+}
+
+.ns-terminal {
   position: relative;
   background:
-    radial-gradient(1200px 600px at 18% 10%, rgba(45, 212, 191, 0.16), transparent 60%),
-    radial-gradient(1000px 540px at 82% 12%, rgba(14, 165, 233, 0.2), transparent 60%),
-    linear-gradient(140deg, #050a14 0%, #08111f 45%, #03070f 100%);
+    radial-gradient(1200px 600px at 80% -10%, rgba(0, 212, 170, 0.06), transparent 60%),
+    var(--ns-bg);
+  color: var(--ns-text);
+  font-family: "Inter", system-ui, sans-serif;
 }
 
-.ns-landing-bg-grid,
-.ns-login-bg-grid {
+.ns-terminal-scanlines {
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(circle at center, black 36%, transparent 90%);
   pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 100% 3px;
+  opacity: 0.5;
 }
 
-.ns-landing-orb,
-.ns-login-orb {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(8px);
-  animation: nsFloat 9s ease-in-out infinite;
-  pointer-events: none;
+/* --- chips / labels --- */
+.ns-term-chip {
+  display: inline-block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--ns-accent);
+  border: 1px solid var(--ns-border-strong);
+  border-radius: 4px;
+  padding: 4px 10px;
 }
 
-.ns-landing-orb-one,
-.ns-login-orb-one {
-  width: 24rem;
-  height: 24rem;
-  left: -6rem;
-  top: -6rem;
-  background: radial-gradient(circle, rgba(45, 212, 191, 0.3) 0%, rgba(45, 212, 191, 0) 72%);
+.ns-term-wordmark {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 600;
+  font-size: clamp(44px, 8vw, 84px);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: var(--ns-text);
+}
+.ns-term-wordmark-sm {
+  font-size: clamp(28px, 5vw, 36px);
 }
 
-.ns-landing-orb-two,
-.ns-login-orb-two {
-  width: 22rem;
-  height: 22rem;
-  right: -5rem;
-  top: 6rem;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.28) 0%, rgba(56, 189, 248, 0) 70%);
-  animation-delay: -2.2s;
+.ns-term-subhead {
+  color: var(--ns-text-2);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
-.ns-landing-orb-three {
-  width: 18rem;
-  height: 18rem;
-  right: 24%;
-  bottom: -4rem;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.24) 0%, rgba(59, 130, 246, 0) 72%);
-  animation-delay: -3.5s;
+/* --- stats grid --- */
+.ns-term-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 460px;
+}
+.ns-term-stat {
+  border: 1px solid var(--ns-border);
+  border-left: 2px solid var(--ns-accent);
+  background: var(--ns-surface);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.ns-term-stat-value {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ns-text);
+}
+.ns-term-stat-label {
+  font-size: 11px;
+  color: var(--ns-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
 }
 
-.ns-glass-panel {
-  border-radius: 1.3rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: linear-gradient(145deg, rgba(15, 23, 42, 0.65), rgba(10, 18, 34, 0.35));
-  backdrop-filter: blur(14px);
-  box-shadow: 0 24px 80px rgba(3, 7, 18, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+/* --- CTA / submit --- */
+.ns-term-cta,
+.ns-term-submit {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ns-accent);
+  background: transparent;
+  border: 1px solid var(--ns-accent);
+  border-radius: 6px;
+  padding: 12px 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-decoration: none;
 }
-
-.ns-brand-title {
-  letter-spacing: -0.03em;
-  color: #ebf8ff;
-  text-shadow: 0 0 36px rgba(56, 189, 248, 0.35);
+.ns-term-cta:hover,
+.ns-term-submit:hover:not(:disabled) {
+  background: rgba(0, 212, 170, 0.12);
 }
-
-.ns-login-cta {
-  color: #03222a;
-  background: linear-gradient(120deg, #5eead4 0%, #7dd3fc 55%, #a5f3fc 100%);
-  box-shadow: 0 12px 35px rgba(45, 212, 191, 0.35);
-  transform-style: preserve-3d;
-  transition: transform 180ms ease, box-shadow 180ms ease;
-}
-
-.ns-login-cta:hover {
-  transform: translateY(-2px) scale(1.01);
-  box-shadow: 0 18px 40px rgba(56, 189, 248, 0.4);
-}
-
-.ns-landing-cube-wrap {
-  position: absolute;
-  right: 8%;
-  top: 22%;
-  width: 9rem;
-  height: 9rem;
-  perspective: 800px;
-}
-
-.ns-landing-cube {
-  position: relative;
+.ns-term-submit {
   width: 100%;
-  height: 100%;
-  transform-style: preserve-3d;
-  animation: nsRotateCube 12s linear infinite;
+  margin-top: 18px;
+}
+.ns-term-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.ns-landing-cube .face {
-  position: absolute;
-  width: 9rem;
-  height: 9rem;
-  border: 1px solid rgba(125, 211, 252, 0.35);
-  background: rgba(10, 30, 55, 0.22);
+.ns-term-foot {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--ns-text-3);
 }
 
-.ns-landing-cube .front { transform: translateZ(4.5rem); }
-.ns-landing-cube .back { transform: rotateY(180deg) translateZ(4.5rem); }
-.ns-landing-cube .left { transform: rotateY(-90deg) translateZ(4.5rem); }
-.ns-landing-cube .right { transform: rotateY(90deg) translateZ(4.5rem); }
-.ns-landing-cube .top { transform: rotateX(90deg) translateZ(4.5rem); }
-.ns-landing-cube .bottom { transform: rotateX(-90deg) translateZ(4.5rem); }
-
-.ns-login-shell {
-  border-radius: 1.15rem;
-  border: 1px solid rgba(148, 163, 184, 0.26);
-  background: linear-gradient(150deg, rgba(14, 22, 38, 0.8), rgba(7, 13, 24, 0.72));
-  box-shadow: 0 26px 80px rgba(2, 6, 16, 0.55);
-  backdrop-filter: blur(14px);
+/* --- boot readout panel --- */
+.ns-term-panel {
+  border: 1px solid var(--ns-border);
+  border-radius: 10px;
+  background: var(--ns-surface);
+  overflow: hidden;
+}
+.ns-term-panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ns-border);
+  background: var(--ns-surface-2);
+}
+.ns-term-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ns-border-strong);
+}
+.ns-term-panel-title {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--ns-text-3);
+  margin-left: 8px;
+}
+.ns-term-readout {
+  margin: 0;
+  padding: 16px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.85;
+  color: var(--ns-text-2);
+  white-space: pre-wrap;
+}
+.ns-term-ok {
+  color: var(--ns-text);
 }
 
-.ns-login-input {
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  background: rgba(9, 15, 29, 0.88);
-  color: #e2e8f0;
+/* --- login card --- */
+.ns-term-login {
+  width: 100%;
+  max-width: 380px;
+  border: 1px solid var(--ns-border);
+  background: var(--ns-surface);
+  border-radius: 12px;
+  padding: 26px 24px 22px;
 }
-
-.ns-login-input:focus {
+.ns-term-back {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: var(--ns-text-3);
+  text-decoration: none;
+}
+.ns-term-back:hover {
+  color: var(--ns-text);
+}
+.ns-term-login-head {
+  margin: 10px 0 18px;
+}
+.ns-term-prompt {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--ns-accent);
+  text-transform: uppercase;
+}
+.ns-term-label {
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--ns-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 14px 0 6px;
+}
+.ns-term-input {
+  width: 100%;
+  height: 38px;
+  background: var(--ns-bg);
+  border: 1px solid var(--ns-border);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: var(--ns-text);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
   outline: none;
-  border-color: rgba(45, 212, 191, 0.8);
-  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.18);
+}
+.ns-term-input:focus {
+  border-color: var(--ns-accent);
 }
 
-.ns-login-button {
-  color: #08252d;
-  background: linear-gradient(120deg, #67e8f9 0%, #5eead4 50%, #22d3ee 100%);
-  box-shadow: 0 12px 35px rgba(34, 211, 238, 0.35);
-  transition: transform 160ms ease, box-shadow 160ms ease;
+/* segmented role control */
+.ns-term-segment {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--ns-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.ns-term-segment-btn {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 9px 4px;
+  background: var(--ns-bg);
+  color: var(--ns-text-3);
+  border: none;
+  border-right: 1px solid var(--ns-border);
+  cursor: pointer;
+}
+.ns-term-segment-btn:last-child {
+  border-right: none;
+}
+.ns-term-segment-btn.is-active {
+  background: rgba(0, 212, 170, 0.14);
+  color: var(--ns-accent);
 }
 
-.ns-login-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 34px rgba(45, 212, 191, 0.44);
+.ns-term-error {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--ns-danger);
+  border-left: 2px solid var(--ns-danger);
+  padding-left: 10px;
 }
 
-.ns-login-credentials {
-  border: 1px solid rgba(148, 163, 184, 0.26);
-  background: rgba(2, 6, 23, 0.42);
+.ns-term-creds {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ns-border);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--ns-text-3);
 }
-
-@keyframes nsFloat {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(0, -14px, 0); }
-}
-
-@keyframes nsRotateCube {
-  0% { transform: rotateX(-18deg) rotateY(0deg); }
-  100% { transform: rotateX(-18deg) rotateY(360deg); }
-}
-
-@media (max-width: 900px) {
-  .ns-landing-cube-wrap {
-    right: 50%;
-    top: 11%;
-    transform: translateX(50%) scale(0.75);
-  }
+.ns-term-creds-title {
+  color: var(--ns-text-2);
+  margin-bottom: 4px;
 }

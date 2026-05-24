@@ -4,7 +4,8 @@ Implements hard and soft gates that determine whether a model
 can be promoted to production:
 
 HARD GATES (must pass — auto-reject on fail):
-  - AUC ≥ MIN_AUC (default 0.80, aspirational 0.90) on each disease
+  - AUC ≥ MIN_AUC (v3 default 0.92) on the evaluated task
+  - Per-disease AUC ≥ 0.88 for every disease (v3, when per_disease_auc supplied)
   - Equalized odds ratio ∈ [0.80, 1.25] (four-fifths rule)
   - No critical robustness failures
 
@@ -94,7 +95,8 @@ class ValidationGates:
     """
 
     # Default gate thresholds (configurable via __init__)
-    DEFAULT_MIN_AUC = 0.80          # 0.90 aspirational for production
+    DEFAULT_MIN_AUC = 0.92          # v3 production target (was 0.80/0.90 aspirational)
+    DEFAULT_MIN_PER_DISEASE_AUC = 0.88  # v3: every disease must clear this floor
     DEFAULT_FAIRNESS_LOWER = 0.80
     DEFAULT_FAIRNESS_UPPER = 1.25
     DEFAULT_MAX_ECE = 0.05
@@ -105,6 +107,7 @@ class ValidationGates:
         self,
         audit_trail: AuditTrail | None = None,
         min_auc: float | None = None,
+        min_per_disease_auc: float | None = None,
         fairness_lower: float | None = None,
         fairness_upper: float | None = None,
         max_ece: float | None = None,
@@ -113,6 +116,9 @@ class ValidationGates:
     ) -> None:
         self._audit = audit_trail
         self.MIN_AUC = min_auc if min_auc is not None else self.DEFAULT_MIN_AUC
+        self.MIN_PER_DISEASE_AUC = (
+            min_per_disease_auc if min_per_disease_auc is not None else self.DEFAULT_MIN_PER_DISEASE_AUC
+        )
         self.FAIRNESS_LOWER = fairness_lower if fairness_lower is not None else self.DEFAULT_FAIRNESS_LOWER
         self.FAIRNESS_UPPER = fairness_upper if fairness_upper is not None else self.DEFAULT_FAIRNESS_UPPER
         self.MAX_ECE = max_ece if max_ece is not None else self.DEFAULT_MAX_ECE
@@ -120,7 +126,7 @@ class ValidationGates:
         self.MAX_ROBUSTNESS_DROP = max_robustness_drop if max_robustness_drop is not None else self.DEFAULT_MAX_ROBUSTNESS_DROP
 
     def _check_hard_auc(self, report: ValidationReport) -> GateResult:
-        """HARD: AUC ≥ 0.90 on each disease."""
+        """HARD: AUC ≥ MIN_AUC (v3 default 0.92)."""
         passed = report.auc >= self.MIN_AUC
         return GateResult(
             gate_name="auc_threshold",
@@ -130,6 +136,20 @@ class ValidationGates:
             metric_value=report.auc,
             threshold=self.MIN_AUC,
             details=f"Disease={report.disease}, AUC={report.auc:.4f}",
+        )
+
+    def _check_hard_per_disease_auc(self, per_disease_auc: dict[str, float]) -> GateResult:
+        """HARD: every individual disease AUC ≥ MIN_PER_DISEASE_AUC (v3 multi-disease gate)."""
+        worst_disease, worst_auc = min(per_disease_auc.items(), key=lambda kv: kv[1])
+        passed = worst_auc >= self.MIN_PER_DISEASE_AUC
+        return GateResult(
+            gate_name="per_disease_min_auc",
+            gate_type="hard",
+            result="PASS" if passed else "HARD_FAIL",
+            metric_name="per_disease_min_auc",
+            metric_value=worst_auc,
+            threshold=self.MIN_PER_DISEASE_AUC,
+            details=f"Weakest disease={worst_disease} AUC={worst_auc:.4f} of {len(per_disease_auc)}",
         )
 
     def _check_hard_fairness(self, report: FairnessReport) -> GateResult:
@@ -215,12 +235,19 @@ class ValidationGates:
         fairness: FairnessReport | None = None,
         robustness: RobustnessReport | None = None,
         model_version: str = "latest",
+        per_disease_auc: dict[str, float] | None = None,
     ) -> GateDecision:
-        """Run all gates and produce a promotion decision."""
+        """Run all gates and produce a promotion decision.
+
+        ``per_disease_auc`` (optional): mapping of disease -> AUC. When provided,
+        adds the v3 hard gate requiring every disease to clear MIN_PER_DISEASE_AUC.
+        """
         gates: list[GateResult] = []
 
         # Hard gates
         gates.append(self._check_hard_auc(validation))
+        if per_disease_auc:
+            gates.append(self._check_hard_per_disease_auc(per_disease_auc))
         if fairness is not None:
             gates.append(self._check_hard_fairness(fairness))
         if robustness is not None:

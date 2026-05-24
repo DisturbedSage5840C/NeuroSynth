@@ -24,3 +24,5 @@ dump.rdb
 static/
 .vercel
 .env*.local
+data/synthetic_v2/
+data/*.parquet

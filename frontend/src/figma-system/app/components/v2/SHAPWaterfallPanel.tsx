@@ -1,4 +1,6 @@
 import { motion } from 'framer-motion';
+import { FEATURE_MAP, featureLabel } from '@/lib/featureSchema';
+import { FeatureLegend } from './FeatureLegend';
 
 interface SHAPValue {
   feature: string;
@@ -16,6 +18,11 @@ export function SHAPWaterfallPanel({ shapValues, maxDisplay = 10 }: SHAPWaterfal
     .slice(0, maxDisplay);
 
   const maxAbs = Math.max(...sorted.map((s) => Math.abs(s.value)), 0.01);
+
+  // Encoded (categorical/boolean) features in view need a legend so 0/1/2 are clear.
+  const encodedFeatures = sorted
+    .map((s) => s.feature)
+    .filter((key) => FEATURE_MAP[key]?.values);
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
@@ -39,14 +46,19 @@ export function SHAPWaterfallPanel({ shapValues, maxDisplay = 10 }: SHAPWaterfal
               transition={{ delay: i * 0.06, duration: 0.4 }}
               className="flex items-center gap-3"
             >
-              {/* Feature name */}
-              <div
-                className="text-xs font-mono text-muted-foreground text-right shrink-0"
-                style={{ width: 160 }}
-                title={item.feature}
-              >
-                {item.feature.length > 20 ? item.feature.slice(0, 18) + '…' : item.feature}
-              </div>
+              {/* Feature name (human-readable) */}
+              {(() => {
+                const label = featureLabel(item.feature);
+                return (
+                  <div
+                    className="text-xs font-mono text-muted-foreground text-right shrink-0"
+                    style={{ width: 160 }}
+                    title={`${label} (${item.feature})`}
+                  >
+                    {label.length > 22 ? label.slice(0, 20) + '…' : label}
+                  </div>
+                );
+              })()}
 
               {/* Bar container (centered) */}
               <div className="flex-1 flex items-center h-6 relative">
@@ -99,6 +111,9 @@ export function SHAPWaterfallPanel({ shapValues, maxDisplay = 10 }: SHAPWaterfal
           Decreases risk
         </div>
       </div>
+
+      {/* Encoding reference for any categorical/boolean features shown above */}
+      <FeatureLegend visibleFeatures={encodedFeatures} />
     </div>
   );
 }

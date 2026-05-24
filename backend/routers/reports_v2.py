@@ -20,14 +20,16 @@ from backend.core.rate_limit import limiter, role_limit
 from backend.deps import get_current_user, get_database
 from backend.db import Database
 from backend.models import ReportRequest, UserContext
-from backend.report_generator_v2 import ClinicalReportGeneratorV2
+from backend.report_generator_v3 import ClinicalReportGeneratorV3
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v2/reports", tags=["reports-v2"])
 
 _report_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="report-gen")
-_report_gen = ClinicalReportGeneratorV2()
+# V3 generator: live Claude SOAP narrative when ANTHROPIC_API_KEY is set,
+# deterministic Jinja2 template fallback otherwise (subclass of V2).
+_report_gen = ClinicalReportGeneratorV3()
 
 
 def _run_report_sync(

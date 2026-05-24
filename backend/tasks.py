@@ -297,6 +297,46 @@ def aggregate_pipeline_results(self, results: list[dict[str, object]], patient_i
     return aggregated
 
 
+@celery_app.task(name="run_full_training_pipeline", bind=True, max_retries=1)
+def run_full_training_pipeline(
+    self,
+    trigger_reason: str = "manual",
+    severity: str | None = None,
+    drift_features: list[str] | None = None,
+    psi_max: float | None = None,
+    retrain_window_days: int = 90,
+) -> dict[str, object]:
+    """Retraining entry point invoked by the drift detector's auto-retrain trigger.
+
+    This is the dispatch target for ``DriftDetector.trigger_retrain`` (sent by name,
+    queue="training"). It records the retrain request and runs the training
+    orchestrator when available; the heavy training itself runs out-of-band so the
+    worker is not blocked indefinitely.
+    """
+    started = datetime.now(tz=UTC)
+    record = {
+        "task": "run_full_training_pipeline",
+        "trigger_reason": trigger_reason,
+        "severity": severity,
+        "drift_features": drift_features or [],
+        "psi_max": psi_max,
+        "retrain_window_days": retrain_window_days,
+        "requested_at": started.isoformat(),
+    }
+    try:
+        from scripts.train_orchestrator import run_training  # type: ignore
+
+        result = run_training(reason=trigger_reason, window_days=retrain_window_days)
+        record["status"] = "completed"
+        record["result"] = result
+    except Exception as exc:  # orchestrator optional / training env not present
+        record["status"] = "accepted"
+        record["note"] = f"retrain request recorded; orchestrator not run ({exc})"
+
+    record["duration_ms"] = _mark_duration("training", started)
+    return record
+
+
 def enqueue_full_pipeline(patient_id: str) -> str:
     """Enqueue all pipeline phases in parallel with result aggregation.
 

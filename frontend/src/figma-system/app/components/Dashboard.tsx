@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { patients } from '../data/mock-data';
 import { ForecastChart } from './ForecastChart';
 import { ConnectomeGraph } from './ConnectomeGraph';
@@ -12,6 +12,9 @@ import type { AnalysisResult } from '../types/analysis';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { RiskScoreGauge, SHAPWaterfallPanel, CounterfactualPanel, ClinicalReportViewer, TrajectoryChart48, LIMEExplanationPanel, ModelPerformanceMonitor } from './v2';
 import { usePatients } from '../hooks/usePatients';
+
+// Lazy: keeps Three.js out of the main bundle until an analysis renders the brain.
+const BrainVisualization3D = lazy(() => import('./v2/BrainVisualization3D'));
 
 interface DashboardProps {
   selectedPatientId: string;
@@ -205,6 +208,29 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
                     }))}
                   />
                 </div>
+              </div>
+
+              {/* 3D Brain (SHAP-colored) */}
+              <div className="rounded-xl border border-border bg-card p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-foreground">3D Brain — SHAP attribution</h3>
+                  <span className="text-xs text-muted-foreground font-mono">drag to rotate · hover a region</span>
+                </div>
+                <Suspense
+                  fallback={
+                    <div className="h-[360px] flex items-center justify-center text-xs text-muted-foreground">
+                      Loading 3D brain…
+                    </div>
+                  }
+                >
+                  <BrainVisualization3D
+                    height={360}
+                    shapValues={(analysisResult.shap_values || []).map((sv: any) => ({
+                      feature: sv.feature || '',
+                      value: typeof sv.value === 'number' ? sv.value : 0,
+                    }))}
+                  />
+                </Suspense>
               </div>
 
               {/* 48-month Trajectory + LIME */}

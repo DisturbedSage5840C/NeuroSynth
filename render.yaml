@@ -1,0 +1,66 @@
+# NeuroSynth v3 — all-in-one free deployment (Render Blueprint).
+#
+# One platform, one click: FastAPI backend + static frontend + Postgres, all on
+# Render's free tier. See DEPLOYMENT.md for the step-by-step and for the
+# "free forever" variant (swap the Render database for Neon, add Upstash Redis).
+#
+# Free-tier notes:
+#  - The web service sleeps after ~15 min idle (first request cold-starts ~30-60s).
+#  - The free Postgres below EXPIRES 30 days after creation. For a permanent free DB,
+#    delete the `databases:` block and set NEUROSYNTH_POSTGRES_DSN to a Neon URL.
+
+databases:
+  - name: neurosynth-db
+    plan: free
+    databaseName: neurosynth
+    user: neurosynth
+
+services:
+  # ---- Backend API (FastAPI) ----
+  - type: web
+    name: neurosynth-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements-deploy.txt
+    startCommand: uvicorn backend.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: NEUROSYNTH_APP_ENV
+        value: prod
+      - key: NEUROSYNTH_AUTH_COOKIE_SECURE
+        value: "true"
+      - key: NEUROSYNTH_POSTGRES_DSN
+        fromDatabase:
+          name: neurosynth-db
+          property: connectionString
+      - key: NEUROSYNTH_JWT_SECRET
+        generateValue: true
+      - key: NEUROSYNTH_PATIENT_HASH_SECRET
+        generateValue: true
+      # Optional: set to an Upstash Redis URL to enable rate limiting + caching.
+      - key: NEUROSYNTH_REDIS_URL
+        sync: false
+      # Optional: set to enable Claude-generated SOAP reports (else template fallback).
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Set to the deployed frontend origin(s), comma-separated, for CORS.
+      - key: NEUROSYNTH_ALLOWED_ORIGINS
+        sync: false
+
+  # ---- Frontend (Vite static SPA) ----
+  - type: web
+    name: neurosynth-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      # Set to the backend URL after first deploy, e.g. https://neurosynth-api.onrender.com
+      # (Render exposes only the bare host via fromService, so set this explicitly.)
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -228,3 +228,75 @@ class DriftDetector:
             report.total_features, report.drifted_features, report.overall_severity.value,
         )
         return report
+
+    # ------------------------------------------------------------------
+    # Auto-retrain trigger (wires drift -> training pipeline)
+    # ------------------------------------------------------------------
+
+    def trigger_retrain(
+        self,
+        report: DriftReport,
+        *,
+        retrain_window_days: int = 90,
+        dispatcher: Any | None = None,
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Dispatch a retraining job in response to drift.
+
+        Decoupled from the backend: dispatches the Celery task ``run_full_training_pipeline``
+        *by name* over the broker (NEUROSYNTH_REDIS_URL) so this module never imports
+        ``backend``. If Celery / the broker is unavailable (or ``dry_run``), the trigger
+        is logged and returned without raising — drift detection must never crash on a
+        dispatch failure. Pass ``dispatcher`` (a callable taking the payload, returning a
+        task id) to override the transport, e.g. in tests.
+        """
+        import os
+
+        payload = {
+            "trigger_reason": f"drift_{report.overall_severity.value.lower()}",
+            "severity": report.overall_severity.value,
+            "drift_features": [
+                f.feature for f in report.feature_results
+                if f.severity == DriftSeverity.CRITICAL
+            ],
+            "psi_max": round(max((f.psi for f in report.feature_results), default=0.0), 6),
+            "retrain_window_days": retrain_window_days,
+        }
+
+        if dispatcher is not None:
+            task_id = dispatcher(payload)
+            logger.info("auto_retrain_triggered via=custom task_id=%s severity=%s", task_id, payload["severity"])
+            return {"status": "dispatched", "task_id": task_id, **payload}
+
+        if dry_run:
+            logger.info("auto_retrain_logged (dry_run) severity=%s features=%s",
+                        payload["severity"], payload["drift_features"])
+            return {"status": "logged", **payload}
+
+        try:
+            from celery import Celery
+
+            broker = os.getenv("NEUROSYNTH_REDIS_URL", "redis://localhost:6379/0")
+            app = Celery("neurosynth-drift", broker=broker, backend=broker)
+            res = app.send_task("run_full_training_pipeline", kwargs=payload, queue="training")
+            logger.info("auto_retrain_triggered task_id=%s severity=%s", res.id, payload["severity"])
+            return {"status": "dispatched", "task_id": res.id, **payload}
+        except Exception as exc:  # broker down / celery missing -> log, never crash
+            logger.warning("auto_retrain_dispatch_failed error=%s (logged only)", exc)
+            return {"status": "logged", "error": str(exc), **payload}
+
+    def detect_and_maybe_retrain(
+        self,
+        reference: np.ndarray | Any,
+        current: np.ndarray | Any,
+        feature_names: list[str] | None = None,
+        *,
+        dispatcher: Any | None = None,
+        dry_run: bool = False,
+    ) -> tuple[DriftReport, dict[str, Any] | None]:
+        """Run detection and auto-trigger retraining when severity is CRITICAL."""
+        report = self.detect(reference, current, feature_names)
+        action = None
+        if report.overall_severity == DriftSeverity.CRITICAL:
+            action = self.trigger_retrain(report, dispatcher=dispatcher, dry_run=dry_run)
+        return report, action

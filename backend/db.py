@@ -39,6 +39,19 @@ class Database:
         async with self.pool.acquire() as conn:
             return await conn.fetch(query, *args)
 
+    async def execute(self, query: str, *args: Any) -> str | None:
+        if self.pool is None:
+            return None
+        async with self.pool.acquire() as conn:
+            return await conn.execute(query, *args)
+
+    async def apply_schema(self, schema_sql: str) -> None:
+        """Apply an idempotent schema (CREATE TABLE IF NOT EXISTS ...) on startup."""
+        if self.pool is None:
+            return
+        async with self.pool.acquire() as conn:
+            await conn.execute(schema_sql)
+
 
 _db = Database()
 

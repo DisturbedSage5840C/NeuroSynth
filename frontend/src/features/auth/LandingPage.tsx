@@ -1,59 +1,73 @@
 import { Link } from "react-router";
-import { Brain, Sparkles, ShieldCheck } from "lucide-react";
 
 import "./auth-experience.css";
 
+const STATS: Array<{ label: string; value: string }> = [
+  { label: "neurological diseases", value: "8" },
+  { label: "clinical biomarkers", value: "54" },
+  { label: "forecast horizon", value: "48 mo" },
+  { label: "validation AUC gate", value: "0.92" },
+];
+
+const BOOT_LINES: string[] = [
+  "$ neurosynth --boot",
+  "[ok] model registry        loaded (7-model ensemble)",
+  "[ok] conformal predictor   calibrated  α=0.05",
+  "[ok] xai engine            SHAP · LIME · counterfactuals",
+  "[ok] clinical reports      SOAP · ICD-10 · FHIR R4",
+  "[ok] drift monitor         online",
+  "ready ▸ awaiting clinician session",
+];
+
 export function LandingPage(): JSX.Element {
   return (
-    <div className="ns-landing min-h-screen overflow-hidden">
-      <div className="ns-landing-bg-grid" />
-      <div className="ns-landing-orb ns-landing-orb-one" />
-      <div className="ns-landing-orb ns-landing-orb-two" />
-      <div className="ns-landing-orb ns-landing-orb-three" />
+    <div className="ns-terminal min-h-screen">
+      <div className="ns-terminal-scanlines" aria-hidden />
 
-      <div className="ns-landing-cube-wrap" aria-hidden>
-        <div className="ns-landing-cube">
-          <span className="face front" />
-          <span className="face back" />
-          <span className="face left" />
-          <span className="face right" />
-          <span className="face top" />
-          <span className="face bottom" />
-        </div>
-      </div>
-
-      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl items-center justify-center px-5 py-10">
-        <section className="ns-glass-panel w-full max-w-3xl p-7 md:p-10">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/8 px-3 py-1 text-xs text-blue-100/90">
-            <Sparkles size={14} />
-            Clinical Intelligence Platform
-          </div>
-
-          <h1 className="ns-brand-title mb-3 text-5xl font-semibold leading-[0.95] tracking-tight md:text-7xl">
-            NeuroSynth
-          </h1>
-
-          <p className="max-w-2xl text-sm text-slate-200/90 md:text-base">
-            Neurological risk analytics with explainable AI, trajectory forecasting, and clinician-ready decision support.
+      <main className="relative z-10 mx-auto grid min-h-screen w-full max-w-6xl items-center gap-10 px-6 py-12 md:grid-cols-2">
+        {/* Left — wordmark + identity */}
+        <section>
+          <div className="ns-term-chip">CLINICAL INTELLIGENCE TERMINAL</div>
+          <h1 className="ns-term-wordmark mt-5">NeuroSynth</h1>
+          <p className="ns-term-subhead mt-4 max-w-md">
+            Neurological risk analysis with explainable AI, 48-month trajectory
+            forecasting, and clinician-ready decision support.
           </p>
 
-          <div className="mt-7 flex flex-wrap gap-3 text-xs text-slate-200/90">
-            <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/6 px-3 py-1">
-              <Brain size={13} /> Multi-model inference
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/6 px-3 py-1">
-              <ShieldCheck size={13} /> Role-secured access
-            </span>
+          <div className="ns-term-stats mt-8">
+            {STATS.map((s) => (
+              <div key={s.label} className="ns-term-stat">
+                <div className="ns-term-stat-value">{s.value}</div>
+                <div className="ns-term-stat-label">{s.label}</div>
+              </div>
+            ))}
           </div>
 
           <div className="mt-9">
-            <Link
-              to="/login"
-              className="ns-login-cta inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold"
-            >
-              Login
+            <Link to="/login" className="ns-term-cta">
+              Enter clinical workspace ▸
             </Link>
           </div>
+          <div className="ns-term-foot mt-6">
+            v3.0 · Research use only · HIPAA-aware · not a diagnostic device
+          </div>
+        </section>
+
+        {/* Right — live boot readout panel */}
+        <section className="ns-term-panel" aria-hidden>
+          <div className="ns-term-panel-bar">
+            <span className="ns-term-dot" />
+            <span className="ns-term-dot" />
+            <span className="ns-term-dot" />
+            <span className="ns-term-panel-title">neurosynth · session</span>
+          </div>
+          <pre className="ns-term-readout">
+            {BOOT_LINES.map((line) => (
+              <div key={line} className={line.startsWith("[ok]") ? "ns-term-ok" : undefined}>
+                {line}
+              </div>
+            ))}
+          </pre>
         </section>
       </main>
     </div>

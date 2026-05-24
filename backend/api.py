@@ -28,7 +28,7 @@ from backend.core.rate_limit import limiter, rate_limit_exceeded_handler
 from backend.core.security import ACCESS_COOKIE, Role, decode_token, hash_patient_id
 from backend.db import get_db
 from backend.deps import require_role
-from backend.routers import admin, auth, biomarkers, causal, health, patients, pipelines, predictions, predictions_v2, reports, reports_v2
+from backend.routers import admin, auth, biomarkers, causal, features, health, patients, pipelines, predictions, predictions_v2, reports, reports_v2
 
 
 def _dataset_path() -> Path:
@@ -137,6 +137,16 @@ async def lifespan(app: FastAPI):
     try:
         await db.connect()
         logger.info("database_connected")
+        # Apply idempotent schema so fresh deploys (Neon/Render) have tables.
+        try:
+            from pathlib import Path as _Path
+
+            schema_path = _Path(__file__).with_name("db_schema.sql")
+            if schema_path.exists():
+                await db.apply_schema(schema_path.read_text(encoding="utf-8"))
+                logger.info("database_schema_applied")
+        except Exception as schema_exc:
+            logger.warning("database_schema_apply_failed", error=str(schema_exc))
     except Exception as exc:
         logger.warning("database_connect_failed", error=str(exc))
 
@@ -275,6 +285,7 @@ app.include_router(pipelines.router)
 # v2 routers
 app.include_router(predictions_v2.router)
 app.include_router(reports_v2.router)
+app.include_router(features.router)
 
 
 @app.get(
