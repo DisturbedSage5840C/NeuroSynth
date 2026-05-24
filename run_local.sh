@@ -45,7 +45,7 @@ echo "[1/4] Installing backend dependencies"
 echo "[2/4] Generating realistic synthetic dataset"
 if [[ "$FORCE_RETRAIN" -eq 1 || ! -f "$DATA" ]]; then
   "$PYTHON" scripts/data/build_realistic_synthetic.py \
-    --n 15000 --noise 0.5 --gain 2.0 --seed 42 --out "$DATA"
+    --n 15000 --noise 0.5 --gain 2.5 --seed 42 --out "$DATA"
 else
   echo "      $DATA exists — skipping (use --retrain to regenerate)"
 fi

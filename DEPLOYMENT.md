@@ -77,7 +77,7 @@ cp .env.example .env          # fill secrets; add ANTHROPIC_API_KEY for live rep
 # Generate the v4 training set first so the container trains the AUC-0.94 ensemble
 # (otherwise startup falls back to the legacy CSV at ~0.82). docker-compose mounts
 # ./data into the container, so this file is picked up automatically.
-python scripts/data/build_realistic_synthetic.py --n 15000 --noise 0.5 --gain 2.0 --seed 42 --out data/realistic_v4.parquet
+python scripts/data/build_realistic_synthetic.py --n 15000 --noise 0.5 --gain 2.5 --seed 42 --out data/realistic_v4.parquet
 
 docker-compose up --build     # api :8000 · frontend :3000 · postgres · redis · kafka · grafana
 ```

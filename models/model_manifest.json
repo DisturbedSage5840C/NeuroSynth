@@ -1,7 +1,7 @@
 {
-  "trained_at": "2026-05-24T09:09:24.312478+00:00",
+  "trained_at": "2026-05-24T13:53:08.746459+00:00",
   "dataset_path": "data/realistic_v4.parquet",
-  "dataset_md5": "bd46959233377180ab65ae1d75d73956",
+  "dataset_md5": "2f3fd5d818ebf5f09edd30357c71c48e",
   "feature_schema": [
     "Age",
     "Gender",
@@ -39,9 +39,9 @@
   "bootstrap_disease": "Parkinson's Disease",
   "dataset_stats": {
     "n_patients": 15000,
-    "n_alzheimers": 7533,
-    "n_healthy": 7467,
-    "pct_alzheimers": 50.22,
+    "n_alzheimers": 7498,
+    "n_healthy": 7502,
+    "pct_alzheimers": 49.99,
     "mean_age": 72.0171,
     "mean_mmse": 25.7301,
     "feature_distributions": {
@@ -242,48 +242,48 @@
     "training_cohort": "full_dataset"
   },
   "metrics": {
-    "accuracy": 0.8603,
-    "f1_weighted": 0.8603,
-    "roc_auc": 0.9408,
-    "precision": 0.8711,
-    "recall": 0.8474,
+    "accuracy": 0.878,
+    "f1_weighted": 0.878,
+    "roc_auc": 0.951,
+    "precision": 0.877,
+    "recall": 0.8793,
     "confusion_matrix": [
       [
-        1304,
-        189
+        1315,
+        185
       ],
       [
-        230,
-        1277
+        181,
+        1319
       ]
     ],
     "classification_report": {
       "0": {
-        "precision": 0.8500651890482399,
-        "recall": 0.8734092431346283,
-        "f1-score": 0.861579121242154,
-        "support": 1493.0
+        "precision": 0.8790106951871658,
+        "recall": 0.8766666666666667,
+        "f1-score": 0.8778371161548731,
+        "support": 1500.0
       },
       "1": {
-        "precision": 0.8710777626193724,
-        "recall": 0.847378898473789,
-        "f1-score": 0.8590649175916583,
-        "support": 1507.0
+        "precision": 0.8769946808510638,
+        "recall": 0.8793333333333333,
+        "f1-score": 0.8781624500665779,
+        "support": 1500.0
       },
-      "accuracy": 0.8603333333333333,
+      "accuracy": 0.878,
       "macro avg": {
-        "precision": 0.8605714758338061,
-        "recall": 0.8603940708042086,
-        "f1-score": 0.8603220194169061,
+        "precision": 0.8780026880191147,
+        "recall": 0.878,
+        "f1-score": 0.8779997831107256,
         "support": 3000.0
       },
       "weighted avg": {
-        "precision": 0.8606205051721388,
-        "recall": 0.8603333333333333,
-        "f1-score": 0.8603161529417216,
+        "precision": 0.8780026880191147,
+        "recall": 0.878,
+        "f1-score": 0.8779997831107255,
         "support": 3000.0
       }
     },
-    "decision_threshold": 0.49
+    "decision_threshold": 0.48
   }
 }

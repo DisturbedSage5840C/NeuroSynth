@@ -134,6 +134,69 @@ async def _drain_celery_queue(timeout_seconds: int = 20) -> None:
         await asyncio.sleep(1.0)
 
 
+def _pull_models_from_r2(models_dir: Path, logger) -> None:
+    """Download trained model artifacts from Cloudflare R2 when models/ is empty.
+
+    No-op unless ``R2_ACCOUNT_ID`` is set, so it's safe locally and in CI. Lets a
+    fresh free-tier container (Render) fetch the gitignored weights on startup.
+    """
+    import os
+
+    if (models_dir / "model_manifest.json").exists():
+        return
+    account = os.getenv("R2_ACCOUNT_ID")
+    if not account:
+        return
+    try:
+        import boto3
+        from botocore.config import Config
+
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=f"https://{account}.r2.cloudflarestorage.com",
+            aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
+            aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
+            config=Config(signature_version="s3v4"),
+            region_name="auto",
+        )
+        bucket = os.environ.get("R2_BUCKET", "neurosynth-models")
+        paginator = s3.get_paginator("list_objects_v2")
+        n = 0
+        for page in paginator.paginate(Bucket=bucket, Prefix="models/"):
+            for obj in page.get("Contents", []):
+                key = obj["Key"]
+                dest = Path(key)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                s3.download_file(bucket, key, str(dest))
+                n += 1
+        logger.info("r2_model_artifacts_downloaded", files=n)
+    except Exception as exc:
+        logger.warning("r2_download_failed", error=str(exc))
+
+
+async def _keepalive_ping(logger) -> None:
+    """Ping /health every 10 min to keep a free-tier (Render) container warm.
+
+    No-op-friendly: only meaningful when KEEPALIVE_ENABLED is set (do not run it
+    locally / in tests). Failures are swallowed.
+    """
+    import os
+
+    if os.getenv("KEEPALIVE_ENABLED", "").lower() not in ("1", "true", "yes"):
+        return
+    await asyncio.sleep(90)  # let startup finish
+    port = os.getenv("PORT", "8000")
+    while True:
+        try:
+            import httpx
+
+            async with httpx.AsyncClient() as client:
+                await client.get(f"http://localhost:{port}/health", timeout=5)
+        except Exception:
+            pass
+        await asyncio.sleep(600)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
@@ -169,6 +232,9 @@ async def lifespan(app: FastAPI):
         from backend.model_registry import ModelRegistry
         from backend.report_generator import ClinicalReportGenerator
         models_dir = Path("models")
+        # Fetch model weights from R2 first if this container has none (free-tier
+        # deploys don't ship the gitignored artifacts). No-op when R2 is unconfigured.
+        _pull_models_from_r2(models_dir, logger)
         dataset_file = _dataset_path()
         from_cache = _manifest_valid(models_dir, dataset_file)
         if not from_cache:
@@ -206,8 +272,14 @@ async def lifespan(app: FastAPI):
         app.state.metrics = {}
         app.state.models_loaded = False
 
+    # Fire-and-forget keepalive (only active when KEEPALIVE_ENABLED is set).
+    app.state.keepalive_task = asyncio.create_task(_keepalive_ping(logger))
+
     yield
 
+    keepalive_task = getattr(app.state, "keepalive_task", None)
+    if keepalive_task is not None:
+        keepalive_task.cancel()
     await _drain_celery_queue()
     redis_client = getattr(app.state, "redis", None)
     if redis_client is not None:
