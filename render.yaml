@@ -48,6 +48,19 @@ services:
       # Set to the deployed frontend origin(s), comma-separated, for CORS.
       - key: NEUROSYNTH_ALLOWED_ORIGINS
         sync: false
+      # Keep the free-tier web service warm (self-pings /health every 10 min).
+      - key: KEEPALIVE_ENABLED
+        value: "true"
+      # Cloudflare R2: trained model weights are pulled on startup (they are
+      # gitignored). Set these to enable full ML inference on the free tier.
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        value: neurosynth-models
 
   # ---- Frontend (Vite static SPA) ----
   - type: web

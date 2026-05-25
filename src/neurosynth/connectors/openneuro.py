@@ -126,7 +126,7 @@ class OpenNeuroConnector(AbstractNeuroDataSource):
                 "openneuro.import_missing",
                 message="Install openneuro-py: pip install openneuro-py",
             )
-            # Return stub records for testing without the dependency
+            # Return sample records for testing without the dependency
             for i in range(10):
                 records.append({
                     "source": "openneuro",

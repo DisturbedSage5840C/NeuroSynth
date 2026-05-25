@@ -96,9 +96,12 @@ def main() -> int:
     report["checks"]["src_todo_placeholder_scan"] = {"ok": len(src_markers) == 0, "issues": src_markers}
 
     required_env = [
+        "NEUROSYNTH_APP_ENV",
         "NEUROSYNTH_JWT_SECRET",
-        "NEUROSYNTH_ALLOWED_ORIGINS",
+        "NEUROSYNTH_PATIENT_HASH_SECRET",
+        "NEUROSYNTH_POSTGRES_DSN",
         "NEUROSYNTH_REDIS_URL",
+        "NEUROSYNTH_ALLOWED_ORIGINS",
     ]
     missing = [v for v in required_env if not os.getenv(v)]
     report["checks"]["required_env"] = {"ok": len(missing) == 0, "missing": missing}

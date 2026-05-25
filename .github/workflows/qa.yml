@@ -34,7 +34,10 @@ jobs:
 
       - name: Run release gate checks
         env:
+          NEUROSYNTH_APP_ENV: dev
           NEUROSYNTH_JWT_SECRET: ci-release-gate-secret-not-for-prod
+          NEUROSYNTH_PATIENT_HASH_SECRET: ci-test-patient-secret
+          NEUROSYNTH_POSTGRES_DSN: postgresql://postgres:postgres@localhost:5432/neurosynth
           NEUROSYNTH_ALLOWED_ORIGINS: https://api.test.local
           NEUROSYNTH_REDIS_URL: redis://localhost:6379/0
         run: python scripts/release_gate.py
