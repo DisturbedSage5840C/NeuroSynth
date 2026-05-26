@@ -21,6 +21,10 @@ jobs:
   ci-cpu:
     name: ci-${{ matrix.python-version }}-cpu
     runs-on: ubuntu-latest
+    # Surface chronic pytest hangs as a fast clear failure instead of a 6h silent
+    # cancellation (GitHub's default). Bounds the time deploy-render/deploy-vercel
+    # wait on the upstream gate.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
