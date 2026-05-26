@@ -5,12 +5,8 @@ import json
 import time
 from dataclasses import dataclass
 
-import mlflow
-from outlines import generate
 from pydantic import ValidationError
-from vllm import LLM
 
-from neurosynth.llm.pmid_verify import PMIDVerifier
 from neurosynth.llm.schemas import ReportSchema
 
 
@@ -19,6 +15,22 @@ class ConstrainedReportGenerator:
     model_name: str = "neurosynth-llm-8b-merged"
 
     def __post_init__(self) -> None:
+        # Heavy GPU-only deps (vllm, outlines, mlflow) are imported on instantiation,
+        # not at module load — so this file can be collected by pytest / imported on
+        # CPU-only hosts without trying to spin up a CUDA-bound vLLM server.
+        try:
+            import mlflow
+            from outlines import generate
+            from vllm import LLM
+
+            from neurosynth.llm.pmid_verify import PMIDVerifier
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError(
+                "ConstrainedReportGenerator requires vllm + outlines + mlflow + biopython. "
+                "Install the GPU extras to use it."
+            ) from exc
+
+        self._mlflow = mlflow
         self.llm = LLM(
             model=self.model_name,
             quantization="awq",
@@ -65,7 +77,9 @@ class ConstrainedReportGenerator:
         payload["prompt_hash"] = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         payload["latency_seconds"] = time.time() - t0
 
-        mlflow.log_metrics({"plausibility_score": score, "latency_seconds": payload["latency_seconds"]})
+        self._mlflow.log_metrics(
+            {"plausibility_score": score, "latency_seconds": payload["latency_seconds"]}
+        )
         return payload
 
     def batch_generate(self, prompts: list[str]) -> list[dict]:
