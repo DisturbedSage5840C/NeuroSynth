@@ -31,3 +31,4 @@ static/
 .env*.local
 data/synthetic_v2/
 data/*.parquet
+not_in_github/
