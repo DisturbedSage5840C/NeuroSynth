@@ -42,7 +42,9 @@ from scripts.data.v5.schema import (
 _DATASETS = {
     "alzheimers": "rabieelkharoua/alzheimers-disease-dataset",
     "dementia": "shashwatwork/dementia-prediction-dataset",
-    "multiclass": "tanishchavaan/neurological-disease-prediction",
+    # Stroke dataset: neurological vascular disease — maps Age, BMI, hypertension,
+    # heart disease, glucose, smoking → stroke (binary). 5,110 rows.
+    "stroke": "fedesoriano/stroke-prediction-dataset",
 }
 
 # Canonical 6-class disease name mapping for fuzzy column values
@@ -331,6 +333,59 @@ def process_multiclass(folder: Path) -> pd.DataFrame:
     return df[ALL_FEATURES + META_COLS]
 
 
+# ─── Dataset 3: Stroke Prediction Dataset (fedesoriano) ──────────────────────
+
+def process_stroke(folder: Path) -> pd.DataFrame:
+    """
+    Stroke dataset: 5,110 rows. Columns: id, gender, age, hypertension,
+    heart_disease, ever_married, work_type, Residence_type,
+    avg_glucose_level, bmi, smoking_status, stroke (0/1).
+    Maps to vascular neurological risk profile.
+    """
+    csv = next(folder.glob("*.csv"), None)
+    if csv is None:
+        raise FileNotFoundError(f"No CSV found in {folder}")
+
+    raw = pd.read_csv(csv)
+    print(f"[stroke] raw shape: {raw.shape}, columns: {list(raw.columns)}")
+
+    n = len(raw)
+    col = {c.strip().lower().replace(" ", "_"): c for c in raw.columns}
+    df = _scaffold(n, "Alzheimer's Disease", "kaggle_stroke")  # vascular neuro → AD risk proxy
+
+    # Direct column mappings
+    if "age" in col:
+        df["Age"] = pd.to_numeric(raw[col["age"]], errors="coerce").clip(10, 110)
+    if "gender" in col:
+        df["Gender"] = (raw[col["gender"]].astype(str).str.lower() == "male").astype(float)
+    if "bmi" in col:
+        df["BMI"] = pd.to_numeric(raw[col["bmi"]], errors="coerce").clip(10, 60)
+    if "hypertension" in col:
+        df["Hypertension"] = pd.to_numeric(raw[col["hypertension"]], errors="coerce").clip(0, 1)
+    if "heart_disease" in col:
+        df["CardiovascularDisease"] = pd.to_numeric(raw[col["heart_disease"]], errors="coerce").clip(0, 1)
+    if "avg_glucose_level" in col:
+        glucose = pd.to_numeric(raw[col["avg_glucose_level"]], errors="coerce")
+        df["Diabetes"] = (glucose > 126).astype(float)  # fasting glucose threshold
+    if "smoking_status" in col:
+        df["Smoking"] = raw[col["smoking_status"]].astype(str).str.lower().isin(
+            ["smokes", "formerly smoked"]
+        ).astype(float)
+    if "ever_married" in col:
+        pass  # not a clinical feature we use
+
+    # Stroke label: stroke patients are high neurological risk
+    stroke_col = col.get("stroke")
+    if stroke_col:
+        df["risk_label"] = pd.to_numeric(raw[stroke_col], errors="coerce").fillna(0).astype(int)
+    else:
+        df["risk_label"] = 0
+
+    pos = df["risk_label"].mean()
+    print(f"[stroke] {n} rows, stroke fraction: {pos:.2%}")
+    return df[ALL_FEATURES + META_COLS]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Download Kaggle neurological datasets")
     ap.add_argument("--out-dir", default="data/raw/kaggle")
@@ -353,7 +408,7 @@ def main() -> None:
     processors = {
         "alzheimers": process_alzheimers,
         "dementia": process_dementia,
-        "multiclass": process_multiclass,
+        "stroke": process_stroke,
     }
 
     for name in targets:

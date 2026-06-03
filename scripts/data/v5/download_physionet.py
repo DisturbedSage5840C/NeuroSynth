@@ -95,46 +95,105 @@ def _list_physionet_files(db: str, version: str) -> list[str]:
 
 
 # ─── PADS: Parkinson's Disease Smartwatch Dataset ────────────────────────────
+# Structure (confirmed via HTTP): 469 patients
+#   preprocessed/file_list.csv  — patient-level demographics + label
+#   questionnaire/questionnaire_response_NNN.json — NMS/UPDRS per patient
+#   patients/patient_NNN.json   — duplicate of file_list rows
+
+_PADS_BASE = f"{_PHYSIONET_BASE}/parkinsons-disease-smartwatch/1.0.0"
+
+_PADS_CONDITION_MAP = {
+    "parkinson's": "Parkinson's Disease",
+    "parkinsons": "Parkinson's Disease",
+    "healthy": "Healthy",
+    "multiple sclerosis": "Multiple Sclerosis",
+    "essential tremor": "Parkinson's Disease",      # closest in schema
+    "other movement disorders": "Parkinson's Disease",
+    "atypical parkinsonism": "Parkinson's Disease",
+}
+
+# NMS questionnaire item IDs → v5 schema features
+_NMS_ITEM_MAP = {
+    "12": "MemoryComplaints",       # "Problems remembering things..."
+    "13": "BehavioralProblems",     # "Loss of interest..."
+    "15": "Confusion",              # "Difficulty concentrating..."
+    "16": "Depression",             # "Feeling sad, low or blue"
+    "17": "Disorientation",         # "Feeling anxious..."
+    "21": "DifficultyCompletingTasks",  # "Falling"
+    "23": "SleepQuality",           # "Difficulty getting to sleep" (inverted)
+}
+
+
+def _fetch_pads_questionnaires(n_patients: int, pads_dir: Path) -> dict[str, dict]:
+    """Fetch NMS questionnaire JSONs and extract clinical feature scores."""
+    features_by_subject: dict[str, dict] = {}
+    print(f"  [pads] fetching questionnaires for {n_patients} patients...")
+    fetched = 0
+    for i in range(1, n_patients + 1):
+        sid = f"{i:03d}"
+        cache = pads_dir / f"questionnaire_{sid}.json"
+        if cache.exists():
+            raw = json.loads(cache.read_text())
+        else:
+            try:
+                url = f"{_PADS_BASE}/questionnaire/questionnaire_response_{sid}.json"
+                time.sleep(0.3)
+                resp = requests.get(url, timeout=15)
+                if resp.status_code == 404:
+                    continue
+                resp.raise_for_status()
+                raw = resp.json()
+                cache.write_text(json.dumps(raw))
+                fetched += 1
+            except Exception:
+                continue
+
+        # Parse NMS items
+        items = raw.get("item", []) if isinstance(raw, dict) else []
+        row: dict[str, float] = {}
+        for item in items:
+            link_id = str(item.get("link_id", "")).lstrip("0") or "0"
+            if link_id in _NMS_ITEM_MAP:
+                answer = item.get("answer", False)
+                val = float(bool(answer))
+                feat = _NMS_ITEM_MAP[link_id]
+                if feat == "SleepQuality":
+                    val = 1.0 - val  # sleep difficulty → invert to quality score
+                row[feat] = val
+        features_by_subject[sid] = row
+
+    print(f"  [pads] fetched {fetched} new questionnaire JSONs, {len(features_by_subject)} total")
+    return features_by_subject
+
 
 def download_pads(out_dir: Path) -> pd.DataFrame | None:
     """
-    PADS — Parkinson's Disease Smartwatch Dataset.
-    Tries wfdb first, then HTTP metadata fetch, then local files.
+    PADS — 469 patients (276 PD, 79 healthy, 11 MS, + other movement disorders).
+    Downloads preprocessed/file_list.csv directly and enriches with questionnaire NMS data.
     """
-    db_id, ver, _, _ = _DATASETS["pads"]
     pads_dir = out_dir / "pads"
     pads_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Try wfdb (fastest if open-access)
-    if not list(pads_dir.glob("*.csv")) and not list(pads_dir.glob("*.tsv")):
-        _wfdb_download(db_id, ver, pads_dir)
-
-    # 2. Try HTTP for key metadata/feature CSV files
-    base_url = f"{_PHYSIONET_BASE}/{db_id}/{ver}"
-    meta_candidates = [
-        f"{base_url}/participants.tsv",
-        f"{base_url}/demographics.csv",
-        f"{base_url}/subjects.csv",
-        f"{base_url}/features.csv",
-        f"{base_url}/clinical_data.csv",
-    ]
-    for url in meta_candidates:
+    # 1. Download file_list.csv (patient demographics + labels)
+    file_list_path = pads_dir / "file_list.csv"
+    if not file_list_path.exists():
+        print("  [pads] downloading preprocessed/file_list.csv ...")
         try:
-            content = _fetch_file(url)
-            fname = url.split("/")[-1]
-            fpath = pads_dir / fname
-            if not fpath.exists():
-                fpath.write_bytes(content)
-                print(f"[pads] fetched: {fname}")
-        except Exception:
-            continue
+            resp = requests.get(f"{_PADS_BASE}/preprocessed/file_list.csv", timeout=30)
+            resp.raise_for_status()
+            file_list_path.write_bytes(resp.content)
+            print(f"  [pads] saved file_list.csv ({len(resp.content)} bytes)")
+        except Exception as exc:
+            print(f"  [pads] failed to download file_list.csv: {exc}")
+            return _load_local_pads(pads_dir)
 
-    raw = _load_local_pads(pads_dir)
-    if raw is None:
-        print("[pads] no data found. Download manually:")
-        print("       https://physionet.org/content/parkinsons-disease-smartwatch/1.0.0/")
-        print("       Place CSV/TSV files in data/raw/physionet/pads/ and re-run.")
-    return raw
+    raw = pd.read_csv(file_list_path)
+    print(f"  [pads] {len(raw)} patients: {raw['condition'].value_counts().to_dict()}")
+
+    # 2. Fetch NMS questionnaire data (adds depression, memory, sleep, etc.)
+    q_features = _fetch_pads_questionnaires(len(raw), pads_dir)
+
+    return _process_pads(raw, q_features)
 
 
 def _load_local_pads(pads_dir: Path) -> pd.DataFrame | None:
@@ -150,61 +209,55 @@ def _load_local_pads(pads_dir: Path) -> pd.DataFrame | None:
     return _process_pads(raw)
 
 
-def _process_pads(raw: pd.DataFrame) -> pd.DataFrame:
+def _process_pads(raw: pd.DataFrame, q_features: dict | None = None) -> pd.DataFrame:
+    """Process PADS file_list.csv into v5 schema, enriched with questionnaire NMS data."""
     n = len(raw)
     if n == 0:
         return None
 
     col = {c.strip().lower().replace(" ", "_").replace("-", "_"): c for c in raw.columns}
-
-    # Determine PD vs control label
-    label_col = None
-    for candidate in ("group", "diagnosis", "label", "condition", "pd", "status", "subject_group"):
-        if candidate in col:
-            label_col = col[candidate]
-            break
-
     df = _scaffold(n, "Parkinson's Disease", "physionet_pads")
 
-    if label_col:
-        labels = raw[label_col].astype(str).str.lower()
-        is_pd = labels.isin(["pd", "parkinson", "parkinson's", "1", "yes", "patient"])
-        df["risk_label"] = is_pd.astype(int)
-        df.loc[~is_pd, "DiseaseType"] = "Healthy"
-        df.loc[~is_pd, "risk_label"] = 0
-    else:
-        df["risk_label"] = 1  # all subjects in PADS are PD patients
+    # Demographics
+    if "age" in col:
+        df["Age"] = pd.to_numeric(raw[col["age"]], errors="coerce").clip(10, 110)
+    if "gender" in col:
+        df["Gender"] = (raw[col["gender"]].astype(str).str.lower() == "male").astype(float)
+    if "weight" in col and "height" in col:
+        w = pd.to_numeric(raw[col["weight"]], errors="coerce")
+        h = pd.to_numeric(raw[col["height"]], errors="coerce") / 100  # cm → m
+        df["BMI"] = (w / (h ** 2)).clip(10, 60)
 
-    # Age / sex
-    for src, dst in [("age", "Age"), ("sex", "Gender"), ("gender", "Gender")]:
-        if src in col:
-            df[dst] = pd.to_numeric(raw[col[src]], errors="coerce")
+    # Disease type + label from condition column
+    if "condition" in col:
+        conditions = raw[col["condition"]].astype(str).str.lower().str.strip()
+        for idx, cond in enumerate(conditions):
+            disease = next(
+                (v for k, v in _PADS_CONDITION_MAP.items() if k in cond),
+                "Parkinson's Disease"
+            )
+            df.loc[idx, "DiseaseType"] = disease
+        df["risk_label"] = (~conditions.isin(["healthy"])).astype(int)
+    elif "label" in col:
+        df["risk_label"] = (pd.to_numeric(raw[col["label"]], errors="coerce") > 0).astype(int)
 
-    # Wearable features (map from common PADS column names)
-    wearable_map = {
-        "tremor": "tremor_amplitude", "tremor_amplitude": "tremor_amplitude",
-        "tremor_rms": "tremor_amplitude", "acceleration_rms": "tremor_amplitude",
-        "gait_speed": "gait_velocity", "gait_velocity": "gait_velocity",
-        "step_velocity": "gait_velocity", "walking_speed": "gait_velocity",
-        "step_asymmetry": "step_asymmetry", "gait_asymmetry": "step_asymmetry",
-        "activity_index": "actigraphy_activity_index",
-        "activity": "actigraphy_activity_index",
-        "hr": "HR_variability", "heart_rate": "HR_variability",
-        "hr_variability": "HR_variability", "hrv": "HR_variability",
-        "spo2": "SpO2_mean", "spo2_mean": "SpO2_mean",
-    }
-    for src_key, dst in wearable_map.items():
-        if src_key in col:
-            df[dst] = pd.to_numeric(raw[col[src_key]], errors="coerce")
+    # Update genomic priors per detected disease type
+    for disease in df["DiseaseType"].unique():
+        mask = df["DiseaseType"] == disease
+        priors = DISEASE_GENOMIC_PRIORS.get(disease, {})
+        for gcol, gval in priors.items():
+            df.loc[mask, gcol] = gval
 
-    # UPDRS if present
-    for src_key, dst in [("updrs_motor", "UPDRS_motor"), ("motor_updrs", "UPDRS_motor"),
-                          ("updrs_total", "UPDRS_total"), ("total_updrs", "UPDRS_total"),
-                          ("updrs", "UPDRS_total")]:
-        if src_key in col:
-            df[dst] = pd.to_numeric(raw[col[src_key]], errors="coerce")
+    # Enrich with NMS questionnaire features (per-subject)
+    if q_features:
+        id_col = col.get("id") or col.get("subject_id") or col.get("resource_id")
+        for idx, row_id in enumerate(raw[id_col].astype(str).str.zfill(3) if id_col else pd.Series()):
+            subject_feats = q_features.get(row_id, {})
+            for feat, val in subject_feats.items():
+                if feat in df.columns:
+                    df.loc[idx, feat] = val
 
-    print(f"[pads] processed {n} rows, PD: {df['risk_label'].mean():.2%}")
+    print(f"[pads] {n} rows: {df['DiseaseType'].value_counts().to_dict()}")
     return df[ALL_FEATURES + META_COLS]
 
 
