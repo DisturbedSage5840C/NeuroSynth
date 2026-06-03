@@ -5,10 +5,12 @@ Datasets:
   2. shashwatwork/dementia-prediction-dataset    (  373 rows — OASIS-2 tabular + imaging)
   3. tanishchavaan/neurological-disease-prediction (~5,000 rows — 6-class multi-disease)
 
-Prerequisites:
-    pip install kaggle
-    # Then EITHER place ~/.kaggle/kaggle.json OR set env vars:
-    # KAGGLE_USERNAME=<user>  KAGGLE_KEY=<api_key>
+Prerequisites (kaggle 2.x new token format):
+    mkdir -p ~/.kaggle
+    echo "KGAT_<your_token>" > ~/.kaggle/access_token
+    chmod 600 ~/.kaggle/access_token
+  OR:
+    export KAGGLE_API_TOKEN=KGAT_<your_token>
 
 Usage:
     python scripts/data/v5/download_kaggle.py [--out-dir data/raw/kaggle]
@@ -21,6 +23,7 @@ _sys.path.insert(0, str(_Path(__file__).resolve().parents[3]))
 import argparse
 import io
 import os
+import subprocess
 import zipfile
 from pathlib import Path
 from typing import Any
@@ -71,31 +74,64 @@ _DISEASE_ALIAS: dict[str, str] = {
 }
 
 
-def _kaggle_api() -> Any:
-    try:
-        import kaggle  # noqa: F401
-        from kaggle.api.kaggle_api_extended import KaggleApiExtended
-        api = KaggleApiExtended()
-        api.authenticate()
-        return api
-    except ImportError:
-        raise ImportError(
-            "kaggle package not installed. Run: pip install kaggle\n"
-            "Then add credentials: ~/.kaggle/kaggle.json "
-            "or set KAGGLE_USERNAME + KAGGLE_KEY env vars."
-        )
-    except Exception as exc:
-        raise RuntimeError(
-            f"Kaggle auth failed: {exc}\n"
-            "Ensure ~/.kaggle/kaggle.json exists with your API credentials from "
-            "https://www.kaggle.com/settings → API → Create New Token"
-        ) from exc
+def _resolve_token() -> str:
+    """Resolve Kaggle API token — supports kaggle 2.x new KGAT_* format."""
+    # 1. Explicit env var (works with both old and new kaggle)
+    token = os.getenv("KAGGLE_API_TOKEN", "").strip()
+    if token:
+        return token
+    # 2. New format: ~/.kaggle/access_token
+    access_token_path = Path.home() / ".kaggle" / "access_token"
+    if access_token_path.exists():
+        token = access_token_path.read_text().strip()
+        if token:
+            return token
+    # 3. Old format: ~/.kaggle/kaggle.json  (username + key)
+    json_path = Path.home() / ".kaggle" / "kaggle.json"
+    if json_path.exists():
+        import json
+        creds = json.loads(json_path.read_text())
+        os.environ["KAGGLE_USERNAME"] = creds.get("username", "")
+        os.environ["KAGGLE_KEY"] = creds.get("key", "")
+        return ""  # old-style: env vars set, no token needed
+
+    raise RuntimeError(
+        "Kaggle credentials not found.\n\n"
+        "  Option A (kaggle 2.x — your API token from kaggle.com/settings):\n"
+        "    mkdir -p ~/.kaggle\n"
+        "    echo 'KGAT_<your_token>' > ~/.kaggle/access_token\n"
+        "    chmod 600 ~/.kaggle/access_token\n\n"
+        "  Option B (env var):\n"
+        "    export KAGGLE_API_TOKEN=KGAT_<your_token>"
+    )
 
 
-def _download_dataset(api: Any, dataset: str, out_dir: Path) -> Path:
+def _download_dataset(token: str, dataset: str, out_dir: Path) -> Path:
+    """Download and unzip a Kaggle dataset using the CLI (works with kaggle 2.x)."""
     dest = out_dir / dataset.split("/")[-1]
     dest.mkdir(parents=True, exist_ok=True)
-    api.dataset_download_files(dataset, path=str(dest), unzip=True, quiet=False)
+
+    env = {**os.environ}
+    if token:
+        env["KAGGLE_API_TOKEN"] = token
+
+    cmd = [
+        _sys.executable, "-m", "kaggle",
+        "datasets", "download",
+        "-d", dataset,
+        "--path", str(dest),
+        "--unzip",
+    ]
+    print(f"  Running: kaggle datasets download -d {dataset} --path {dest} --unzip")
+    result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"kaggle CLI failed (exit {result.returncode}):\n"
+            f"  stdout: {result.stdout.strip()}\n"
+            f"  stderr: {result.stderr.strip()}"
+        )
+    if result.stdout:
+        print(f"  {result.stdout.strip()}")
     return dest
 
 
@@ -307,9 +343,9 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    api = None
+    token = ""
     if not args.skip_download:
-        api = _kaggle_api()
+        token = _resolve_token()
 
     targets = args.only or list(_DATASETS.keys())
     frames: list[pd.DataFrame] = []
@@ -327,7 +363,7 @@ def main() -> None:
         if not args.skip_download:
             print(f"\n[{name}] downloading kaggle dataset: {dataset_id} ...")
             try:
-                folder = _download_dataset(api, dataset_id, out_dir)
+                folder = _download_dataset(token, dataset_id, out_dir)
             except Exception as exc:
                 print(f"[{name}] download failed: {exc} — skipping")
                 continue

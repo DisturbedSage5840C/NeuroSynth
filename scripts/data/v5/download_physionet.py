@@ -39,13 +39,29 @@ from scripts.data.v5.schema import (
 
 _PHYSIONET_BASE = "https://physionet.org/files"
 
-# PhysioNet dataset registry: name → (db_path, version)
+# PhysioNet dataset registry: db_name → (wfdb_db_id, version, disease, open_access)
 _DATASETS = {
-    "pads": ("parkinsons-disease-smartwatch", "1.0.0"),
-    "noneeg": ("noneeg-neurological-status", "1.0.0"),
+    "pads":   ("parkinsons-disease-smartwatch", "1.0.0", "Parkinson's Disease", True),
+    "noneeg": ("noneeg-neurological-status",    "1.0.0", "Parkinson's Disease", True),
 }
 
 _RATE_LIMIT_DELAY = 1.5  # seconds between requests (PhysioNet rate-limits aggressively)
+
+
+def _wfdb_download(db_id: str, version: str, dest: Path) -> bool:
+    """Download a PhysioNet database using wfdb. Returns True on success."""
+    try:
+        import wfdb
+        dest.mkdir(parents=True, exist_ok=True)
+        print(f"  wfdb: downloading {db_id} v{version} → {dest}")
+        wfdb.dl_database(db_id, dl_dir=str(dest))
+        return True
+    except ImportError:
+        print("  wfdb not installed — run: pip install wfdb")
+        return False
+    except Exception as exc:
+        print(f"  wfdb download failed: {exc}")
+        return False
 
 
 def _scaffold(n: int, disease_type: str, data_source: str) -> pd.DataFrame:
@@ -82,64 +98,43 @@ def _list_physionet_files(db: str, version: str) -> list[str]:
 
 def download_pads(out_dir: Path) -> pd.DataFrame | None:
     """
-    PADS contains per-subject time-series from smartwatch sensors.
-    We aggregate to per-subject rows extracting wearable feature summaries.
+    PADS — Parkinson's Disease Smartwatch Dataset.
+    Tries wfdb first, then HTTP metadata fetch, then local files.
     """
-    db, ver = _DATASETS["pads"]
-    base_url = f"{_PHYSIONET_BASE}/{db}/{ver}"
+    db_id, ver, _, _ = _DATASETS["pads"]
     pads_dir = out_dir / "pads"
     pads_dir.mkdir(parents=True, exist_ok=True)
 
-    # Try to get the subject metadata first
+    # 1. Try wfdb (fastest if open-access)
+    if not list(pads_dir.glob("*.csv")) and not list(pads_dir.glob("*.tsv")):
+        _wfdb_download(db_id, ver, pads_dir)
+
+    # 2. Try HTTP for key metadata/feature CSV files
+    base_url = f"{_PHYSIONET_BASE}/{db_id}/{ver}"
     meta_candidates = [
         f"{base_url}/participants.tsv",
-        f"{base_url}/RECORDS",
         f"{base_url}/demographics.csv",
         f"{base_url}/subjects.csv",
+        f"{base_url}/features.csv",
+        f"{base_url}/clinical_data.csv",
     ]
-
-    meta_df = None
     for url in meta_candidates:
         try:
             content = _fetch_file(url)
             fname = url.split("/")[-1]
-            (pads_dir / fname).write_bytes(content)
-            if fname.endswith(".tsv"):
-                meta_df = pd.read_csv(io.BytesIO(content), sep="\t")
-            elif fname.endswith(".csv"):
-                meta_df = pd.read_csv(io.BytesIO(content))
-            if meta_df is not None:
-                print(f"[pads] metadata: {fname} — {len(meta_df)} subjects")
-                break
+            fpath = pads_dir / fname
+            if not fpath.exists():
+                fpath.write_bytes(content)
+                print(f"[pads] fetched: {fname}")
         except Exception:
             continue
 
-    # Try to fetch summary CSV files (some PhysioNet datasets include pre-computed features)
-    summary_candidates = [
-        f"{base_url}/features.csv",
-        f"{base_url}/summary.csv",
-        f"{base_url}/clinical_data.csv",
-    ]
-    summary_df = None
-    for url in summary_candidates:
-        try:
-            content = _fetch_file(url)
-            summary_df = pd.read_csv(io.BytesIO(content))
-            (pads_dir / url.split("/")[-1]).write_bytes(content)
-            print(f"[pads] feature summary: {len(summary_df)} rows")
-            break
-        except Exception:
-            continue
-
-    if summary_df is None and meta_df is None:
-        print("[pads] could not download PADS automatically — PhysioNet may require account.")
-        print("       Manual: download from https://physionet.org/content/parkinsons-disease-smartwatch/")
-        print("       Place CSV files in data/raw/physionet/pads/ and re-run.")
-        return _load_local_pads(pads_dir)
-
-    # Process whichever we got
-    raw = summary_df if summary_df is not None else meta_df
-    return _process_pads(raw)
+    raw = _load_local_pads(pads_dir)
+    if raw is None:
+        print("[pads] no data found. Download manually:")
+        print("       https://physionet.org/content/parkinsons-disease-smartwatch/1.0.0/")
+        print("       Place CSV/TSV files in data/raw/physionet/pads/ and re-run.")
+    return raw
 
 
 def _load_local_pads(pads_dir: Path) -> pd.DataFrame | None:
@@ -216,40 +211,35 @@ def _process_pads(raw: pd.DataFrame) -> pd.DataFrame:
 # ─── Non-EEG Neurological Status ─────────────────────────────────────────────
 
 def download_noneeg(out_dir: Path) -> pd.DataFrame | None:
-    db, ver = _DATASETS["noneeg"]
-    base_url = f"{_PHYSIONET_BASE}/{db}/{ver}"
+    """Non-EEG Neurological Status dataset — wfdb first, then HTTP, then local."""
+    db_id, ver, _, _ = _DATASETS["noneeg"]
     noneeg_dir = out_dir / "noneeg"
     noneeg_dir.mkdir(parents=True, exist_ok=True)
 
-    candidates = [
-        f"{base_url}/clinical_data.csv",
-        f"{base_url}/demographics.csv",
-        f"{base_url}/participants.tsv",
-        f"{base_url}/summary.csv",
-        f"{base_url}/data.csv",
-    ]
-    raw_df = None
-    for url in candidates:
+    # 1. wfdb
+    if not list(noneeg_dir.glob("*.csv")) and not list(noneeg_dir.glob("*.tsv")):
+        _wfdb_download(db_id, ver, noneeg_dir)
+
+    # 2. HTTP metadata files
+    base_url = f"{_PHYSIONET_BASE}/{db_id}/{ver}"
+    for fname in ("clinical_data.csv", "demographics.csv", "participants.tsv", "summary.csv", "data.csv"):
+        url = f"{base_url}/{fname}"
+        fpath = noneeg_dir / fname
+        if fpath.exists():
+            continue
         try:
             content = _fetch_file(url)
-            fname = url.split("/")[-1]
-            (noneeg_dir / fname).write_bytes(content)
-            raw_df = pd.read_csv(
-                io.BytesIO(content),
-                sep="\t" if fname.endswith(".tsv") else ","
-            )
-            print(f"[noneeg] found {fname}: {len(raw_df)} rows")
-            break
+            fpath.write_bytes(content)
+            print(f"[noneeg] fetched: {fname}")
         except Exception:
             continue
 
+    raw_df = _load_local_noneeg(noneeg_dir)
     if raw_df is None:
-        print("[noneeg] could not download — check manually at:")
-        print("         https://physionet.org/content/noneeg-neurological-status/")
-        print("         Place CSV files in data/raw/physionet/noneeg/ and re-run.")
-        return _load_local_noneeg(noneeg_dir)
-
-    return _process_noneeg(raw_df)
+        print("[noneeg] no data found. Download manually:")
+        print("         https://physionet.org/content/noneeg-neurological-status/1.0.0/")
+        print("         Place CSV/TSV files in data/raw/physionet/noneeg/ and re-run.")
+    return raw_df
 
 
 def _load_local_noneeg(noneeg_dir: Path) -> pd.DataFrame | None:
