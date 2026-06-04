@@ -31,4 +31,7 @@ static/
 .env*.local
 data/synthetic_v2/
 data/*.parquet
+data/raw/
+data/oasis*/
 not_in_github/
+models/ensemble_v5/
