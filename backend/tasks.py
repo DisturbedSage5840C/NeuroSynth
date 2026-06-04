@@ -372,3 +372,93 @@ def enqueue_full_pipeline(patient_id: str) -> str:
     callback = aggregate_pipeline_results.s(patient_id=patient_id)
     result = chord(parallel_tasks)(callback)
     return result.id
+
+
+# ── v5 periodic beat tasks ─────────────────────────────────────────────────────
+
+from backend.celery_app import celery_app as _app  # noqa: E402
+
+
+@_app.task(name="backend.tasks.check_data_source_freshness", bind=True, max_retries=2)
+def check_data_source_freshness(self):
+    """Mark data sources as pending when their last_updated is > 7 days old.
+
+    Called daily by Celery beat (03:00 UTC). Writes status to the data_sources
+    DB table so the DataPipeline UI shows stale sources in amber.
+    """
+    import asyncio
+    from datetime import timedelta
+
+    try:
+        from backend.db import get_db
+        from backend.services.data_pipeline_service import CANONICAL_SOURCES
+
+        db = get_db()
+
+        async def _run():
+            stale_cutoff = datetime.now(UTC) - timedelta(days=7)
+            results = []
+            for src in CANONICAL_SOURCES:
+                if src.get("tier") == "—":
+                    continue  # skip synthetic
+                row = await db.pool.fetchrow(
+                    "SELECT last_updated, status FROM data_sources WHERE name = $1",
+                    src["name"],
+                )
+                if row is None or row["last_updated"] is None:
+                    continue
+                if row["last_updated"] < stale_cutoff and row["status"] == "active":
+                    await db.pool.execute(
+                        "UPDATE data_sources SET status = 'pending' WHERE name = $1",
+                        src["name"],
+                    )
+                    results.append(src["name"])
+            return results
+
+        stale = asyncio.run(_run())
+        return {"stale_marked": stale, "checked_at": datetime.now(UTC).isoformat()}
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=300)
+
+
+@_app.task(name="backend.tasks.recompute_cohort_stats", bind=True, max_retries=1)
+def recompute_cohort_stats(self):
+    """Recompute cohort statistics from real_v5.parquet and refresh the DB cache.
+
+    Called weekly by Celery beat (Monday 04:00 UTC).
+    """
+    import asyncio
+
+    try:
+        from backend.db import get_db
+        from backend.services.data_pipeline_service import DataPipelineService
+
+        db = get_db()
+        svc = DataPipelineService(db=db)
+
+        # Invalidate cache so get_cohort_stats recomputes from parquet
+        async def _invalidate():
+            await db.pool.execute("DELETE FROM cohort_stats WHERE stat_key = 'v5_cohort'")
+
+        asyncio.run(_invalidate())
+
+        # Recompute (synchronous parquet read)
+        stats = svc._compute_from_parquet()
+
+        # Write back to cache
+        import json as _json
+
+        async def _write(stats):
+            await db.pool.execute(
+                """
+                INSERT INTO cohort_stats (stat_key, stat_value)
+                VALUES ('v5_cohort', $1)
+                ON CONFLICT (stat_key) DO UPDATE SET stat_value = $1, computed_at = NOW()
+                """,
+                _json.dumps(stats),
+            )
+
+        asyncio.run(_write(stats))
+        return {"recomputed": True, "total_patients": stats.get("total_patients", 0)}
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=600)

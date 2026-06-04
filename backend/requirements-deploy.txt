@@ -1,8 +1,11 @@
-# Slim API runtime for free-tier hosting (Render/Fly/Railway).
-# Excludes torch & shap (too large for free build/disk limits) — the app's lifespan
-# loads those lazily and degrades gracefully when absent, so all HTTP endpoints still
-# respond (auth, feature schema, reports with LLM/template fallback). For full
-# multi-modal ML inference, deploy the Docker image (docker-compose) on a paid host.
+# Slim API runtime for free-tier hosting (Render free tier, 512 MB RAM).
+#
+# Excludes: torch, shap, tabnet, lightgbm — too large for Render free build/disk.
+# The lifespan degrades gracefully: all HTTP endpoints remain live, ML inference
+# falls back to the subset of models that fit (CatBoost + RF + LR load from R2).
+# For full multi-modal inference, deploy the Docker image instead.
+
+# ── Core API ──────────────────────────────────────────────────────────────────
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
 pydantic==2.7.4
@@ -11,24 +14,45 @@ structlog==24.4.0
 tenacity==8.5.0
 aiofiles==24.1.0
 httpx==0.27.0
+python-multipart==0.0.9
+jinja2==3.1.4
+
+# ── Database ──────────────────────────────────────────────────────────────────
 asyncpg==0.29.0
+pgvector>=0.2.5
+
+# ── Cache / rate-limit ────────────────────────────────────────────────────────
 redis==5.0.7
-celery==5.4.0
 slowapi==0.1.9
+
+# ── Auth / security ───────────────────────────────────────────────────────────
 pyjwt==2.8.0
 python-jose==3.3.0
-pandera==0.20.2
+
+# ── Observability ─────────────────────────────────────────────────────────────
 prometheus-client==0.20.0
 prometheus-fastapi-instrumentator==7.0.0
+
+# ── Data / ML ─────────────────────────────────────────────────────────────────
 pandas==2.2.0
 numpy==1.26.4
 scikit-learn==1.4.0
 scipy==1.12.0
 joblib==1.3.2
-requests==2.31.0
-python-multipart==0.0.9
-jinja2==3.1.4
+pandera==0.20.2
+
+# CatBoost: compact enough for free tier (~40 MB wheel, no torch dep).
+catboost>=1.2.7
+
+# ── LLM / RAG ─────────────────────────────────────────────────────────────────
 anthropic>=0.39.0,<1.0
-# Optional: pull trained model artifacts from Cloudflare R2 on startup (no-op if
-# R2_* env vars are unset). Small, safe to include in the slim runtime.
+openai>=1.30.0
+tiktoken>=0.7.0
+biopython>=1.83
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+requests==2.31.0
+celery==5.4.0
+
+# R2 artifact pull on startup (no-op when R2_* env vars are unset).
 boto3>=1.34,<2.0

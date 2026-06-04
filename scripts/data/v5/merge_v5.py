@@ -46,7 +46,8 @@ from scripts.data.v5.schema import (
     WEARABLE_6,
 )
 
-# Ordered list of source parquets to try (first match wins per file name)
+# Ordered list of source parquets to try.
+# Combined files (*_combined_v5.parquet) are excluded — they duplicate individual sources.
 _SOURCE_GLOBS = [
     "data/raw/kaggle/**/*_v5.parquet",
     "data/raw/uci/**/*_v5.parquet",
@@ -56,6 +57,9 @@ _SOURCE_GLOBS = [
     # Legacy: the existing realistic_v4.parquet is kept as fallback if no real data available
     "data/realistic_v4.parquet",
 ]
+# Files matching these patterns are skipped (they aggregate individual sources already loaded)
+_SKIP_PATTERNS = {"_combined_v5", "physionet_combined_v5", "uci_combined_v5",
+                   "kaggle_combined_v5", "openneuro_combined_v5"}
 
 _GNOMAD_SCORES = "data/raw/gnomad/disease_risk_scores.json"
 _MIN_ROWS = 500  # warn if merged dataset is below this
@@ -159,19 +163,32 @@ def _fill_missing_core(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _deduplicate(df: pd.DataFrame) -> pd.DataFrame:
-    """Drop near-duplicate rows (same Age + MMSE + DiseaseType ± tolerance)."""
+    """
+    Drop rows that are fully identical across ALL features + meta within the same source.
+    Rows with fewer than 4 non-NaN feature values are considered data-sparse (e.g. OpenNeuro
+    participants.tsv with only Age) and are never deduplicated — they are unique patients
+    who appear identical only because most schema columns are absent for that dataset.
+    """
     before = len(df)
-    # Round continuous keys to reduce floating-point near-duplicates from multi-visit datasets
-    key_cols = [c for c in ("Age", "MMSE", "Gender", "DiseaseType", "data_source") if c in df.columns]
-    if key_cols:
-        rounded = df[key_cols].copy()
-        for c in ("Age", "MMSE"):
-            if c in rounded.columns:
-                rounded[c] = rounded[c].round(0)
-        df = df[~rounded.duplicated()].reset_index(drop=True)
+    feature_cols = [c for c in ALL_FEATURES if c in df.columns]
+    dedup_cols = feature_cols + ["DiseaseType", "data_source"]
+
+    # Compute feature density per row
+    n_obs = df[feature_cols].notna().sum(axis=1)
+    # Only dedup rows rich enough to be meaningfully compared (≥10 non-NaN features).
+    # Sparse rows (e.g. OpenNeuro participants.tsv with only Age + genomic priors) are
+    # kept as-is — they represent unique patients who appear identical only because most
+    # clinical columns are absent from that dataset.
+    rich = n_obs >= 10
+    sparse = ~rich
+
+    rich_df = df[rich].drop_duplicates(subset=dedup_cols).reset_index(drop=True)
+    sparse_df = df[sparse].reset_index(drop=True)
+
+    df = pd.concat([rich_df, sparse_df], ignore_index=True)
     after = len(df)
     if before > after:
-        print(f"  Deduplication: {before} → {after} rows ({before - after} removed)")
+        print(f"  Exact-duplicate removal: {before} → {after} rows ({before - after} removed)")
     return df
 
 
@@ -254,6 +271,11 @@ def main() -> None:
 
     print()
     for path in found_paths:
+        # Skip combined aggregate files (they duplicate the individual sources already loaded)
+        if any(pat in path.name for pat in _SKIP_PATTERNS):
+            print(f"  [skip] {path.name} (combined aggregate — individual sources loaded separately)")
+            continue
+
         is_synthetic = "synthetic" in path.name or "realistic_v4" in path.name
         if is_synthetic and not args.include_synthetic_fallback:
             print(f"  [skip] {path.name} (synthetic fallback — use --include-synthetic-fallback to include)")

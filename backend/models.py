@@ -199,12 +199,22 @@ class HealthResponse(BaseModel):
 
 class ReadyResponse(BaseModel):
     model_config = ConfigDict(
-        json_schema_extra={"example": {"status": "ready", "database": True, "redis": True, "models_loaded": True}}
+        json_schema_extra={"example": {
+            "status": "ready", "database": True, "redis": True,
+            "models_loaded": True, "rag_enabled": False,
+            "fusion_loaded": False, "pgvector_ok": False,
+            "schema_version": "v5",
+        }}
     )
     status: str
     database: bool
     redis: bool
     models_loaded: bool
+    # v5 additions
+    rag_enabled: bool = False
+    fusion_loaded: bool = False
+    pgvector_ok: bool = False
+    schema_version: str = "v5"
 
 
 class QueueDepthResponse(BaseModel):

@@ -1,38 +1,46 @@
 import { useEffect, useState } from 'react';
-import { Outlet, NavLink } from 'react-router';
-import { useNavigate } from 'react-router';
-import { LayoutDashboard, FileText, Database, Brain, BarChart2, LogOut } from 'lucide-react';
+import { Outlet, NavLink, useNavigate } from 'react-router';
+import {
+  LayoutDashboard, FileText, Database, Brain, BarChart2,
+  FlaskConical, BookOpen, Network, Settings, LogOut,
+} from 'lucide-react';
 import { PatientSidebar } from './PatientSidebar';
 import { patients } from '../data/mock-data';
 import { useAuthStore } from '../../../state/authStore';
 import { useAnalysisStore } from '../../../state/analysisStore';
+import './layout.css';
 
-const navItems = [
-  { to: '/app', icon: <LayoutDashboard size={16} />, label: 'Dashboard' },
-  { to: '/app/report', icon: <FileText size={16} />, label: 'Report' },
-  { to: '/app/explorer', icon: <Database size={16} />, label: 'Explorer' },
-  { to: '/app/performance', icon: <BarChart2 size={16} />, label: 'Performance' },
+const NAV_PRIMARY = [
+  { to: '/app',             Icon: LayoutDashboard, label: 'Dashboard',   end: true  },
+  { to: '/app/report',      Icon: FileText,        label: 'Report',      end: false },
+  { to: '/app/explorer',    Icon: Database,        label: 'Explorer',    end: false },
+  { to: '/app/performance', Icon: BarChart2,       label: 'Performance', end: false },
+];
+
+const NAV_V5 = [
+  { to: '/app/cohort',     Icon: FlaskConical, label: 'Cohort',      end: false },
+  { to: '/app/data',       Icon: Network,      label: 'Data',        end: false },
+  { to: '/app/literature', Icon: BookOpen,     label: 'Literature',  end: false },
+  { to: '/app/brain',      Icon: Brain,        label: 'Brain Atlas', end: false },
 ];
 
 export function Layout() {
   const [selectedPatientId, setSelectedPatientId] = useState(patients[0].id);
   const latestAnalysis = useAnalysisStore((s) => s.result);
   const navigate = useNavigate();
-  const clear = useAuthStore((s) => s.clear);
+  const clear    = useAuthStore((s) => s.clear);
 
   useEffect(() => {
-    if (latestAnalysis?.patient_id) {
-      setSelectedPatientId(latestAnalysis.patient_id);
-    }
+    if (latestAnalysis?.patient_id) setSelectedPatientId(latestAnalysis.patient_id);
   }, [latestAnalysis?.patient_id]);
 
   const handleLogout = async () => {
     try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch { /* ignore network error */ }
+      await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/auth/logout`,
+        { method: 'POST', credentials: 'include' },
+      );
+    } catch { /* network error is fine */ }
     clear();
     navigate('/login');
   };
@@ -40,55 +48,61 @@ export function Layout() {
   return (
     <div className="h-screen flex bg-background text-foreground overflow-hidden">
       {/* Nav rail */}
-      <div className="w-44 flex flex-col py-4 gap-1 px-3 border-r border-border bg-[var(--sidebar)]">
-        <div className="px-3 mb-6">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center flex-shrink-0">
-              <Brain size={14} className="text-primary" />
-            </div>
-            <div>
-              <div className="font-semibold text-foreground" style={{ fontSize: 13 }}>NeuroSynth</div>
-              <div className="text-muted-foreground" style={{ fontSize: 9 }}>v3.2 · Clinical AI</div>
-            </div>
+      <nav className="nav-rail">
+        <div className="nav-logo">
+          <div className="nav-logo-icon">
+            <Brain size={13} />
+          </div>
+          <div>
+            <div className="nav-logo-name">NeuroSynth</div>
+            <div className="nav-logo-sub">v5 · Clinical AI</div>
           </div>
         </div>
-        {navItems.map(item => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `w-full h-10 rounded-lg flex items-center gap-3 px-3 transition-colors ${
-                isActive ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-              }`
-            }
-            title={item.label}
-            end={item.to === '/app'}
-          >
-            <span className="flex items-center gap-3 w-full">
-              {item.icon}
-              <span style={{ fontSize: 13 }}>{item.label}</span>
-            </span>
-          </NavLink>
+
+        {NAV_PRIMARY.map(({ to, Icon, label, end }) => (
+          <NavItem key={to} to={to} icon={<Icon size={14} />} label={label} end={end} />
         ))}
-        <div className="mt-auto pb-2">
-          <button
-            onClick={handleLogout}
-            className="w-full h-10 rounded-lg flex items-center gap-3 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-            title="Sign out"
-          >
-            <span className="flex items-center gap-3 w-full">
-              <LogOut size={16} />
-              <span style={{ fontSize: 13 }}>Sign out</span>
-            </span>
+
+        <div className="nav-divider" />
+
+        <div className="nav-section-label">v5 features</div>
+        {NAV_V5.map(({ to, Icon, label, end }) => (
+          <NavItem key={to} to={to} icon={<Icon size={14} />} label={label} end={end} />
+        ))}
+
+        <div className="nav-bottom">
+          <NavItem to="/app/settings" icon={<Settings size={14} />} label="Settings" end={false} />
+          <button type="button" className="nav-logout" onClick={handleLogout}>
+            <LogOut size={14} />
+            <span>Sign out</span>
           </button>
         </div>
-      </div>
+      </nav>
 
-      {/* Patient sidebar */}
       <PatientSidebar selectedId={selectedPatientId} onSelect={setSelectedPatientId} />
-
-      {/* Main content */}
       <Outlet context={{ selectedPatientId }} />
     </div>
+  );
+}
+
+function NavItem({
+  to, icon, label, end,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  end: boolean;
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        `nav-item ${isActive ? 'nav-item-active' : 'nav-item-inactive'}`
+      }
+    >
+      {icon}
+      <span>{label}</span>
+    </NavLink>
   );
 }

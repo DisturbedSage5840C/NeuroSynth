@@ -28,7 +28,7 @@ from backend.core.rate_limit import limiter, rate_limit_exceeded_handler
 from backend.core.security import ACCESS_COOKIE, Role, decode_token, hash_patient_id
 from backend.db import get_db
 from backend.deps import require_role
-from backend.routers import admin, auth, biomarkers, causal, features, health, patients, pipelines, predictions, predictions_v2, reports, reports_v2
+from backend.routers import admin, auth, biomarkers, causal, data as data_router, features, health, literature, patients, pipelines, predictions, predictions_v2, predictions_v3, reports, reports_v2
 
 
 def _dataset_path() -> Path:
@@ -230,7 +230,7 @@ async def lifespan(app: FastAPI):
 
     try:
         from backend.model_registry import ModelRegistry
-        from backend.report_generator import ClinicalReportGenerator
+        from backend.report_generator_v4 import ClinicalReportGeneratorV4
         models_dir = Path("models")
         # Fetch model weights from R2 first if this container has none (free-tier
         # deploys don't ship the gitignored artifacts). No-op when R2 is unconfigured.
@@ -242,7 +242,19 @@ async def lifespan(app: FastAPI):
 
         registry = ModelRegistry(models_dir=models_dir).load_all()
 
-        reporter = ClinicalReportGenerator()
+        # v4 reporter: RAG-enhanced SOAP when pgvector + OpenAI key are available;
+        # falls back to plain Claude SOAP (v3) then Jinja2 template (v2).
+        reporter = ClinicalReportGeneratorV4(db=db)
+
+        # RAG object for the literature search router
+        try:
+            from src.neurosynth.llm.rag_v2 import PubMedRAG
+            import os as _os
+            app.state.rag = PubMedRAG(db=db, openai_api_key=_os.getenv("OPENAI_API_KEY"))
+            logger.info("rag_initialized rag_enabled=%s", app.state.rag.enabled)
+        except Exception as _rag_exc:
+            app.state.rag = None
+            logger.warning("rag_init_failed error=%s", _rag_exc)
 
         app.state.pipeline = None
         app.state.predictor = registry.predictor
@@ -257,6 +269,34 @@ async def lifespan(app: FastAPI):
         app.state.metrics = registry.manifest.get("metrics", {})
         app.state.models_loaded = True
         logger.info("ml_models_loaded", source="cache" if from_cache else "pretrain")
+
+        # CrossAttentionFusion — load if available
+        try:
+            from src.neurosynth.models.fusion import CrossAttentionFusion
+            import torch as _torch
+            fusion_path = models_dir / "ensemble_v5" / "cross_attention_fusion.pt"
+            if fusion_path.exists():
+                fusion = CrossAttentionFusion(n_modalities=5)
+                fusion.load_state_dict(_torch.load(fusion_path, map_location="cpu"))
+                fusion.eval()
+                app.state.fusion = fusion
+                logger.info("cross_attention_fusion_loaded path=%s", fusion_path)
+            else:
+                app.state.fusion = None
+        except Exception as _fx_exc:
+            app.state.fusion = None
+            logger.debug("cross_attention_fusion_not_loaded reason=%s", _fx_exc)
+
+        # Data pipeline service — seed data_sources table
+        try:
+            from backend.services.data_pipeline_service import DataPipelineService
+            svc = DataPipelineService(db=db)
+            await svc.upsert_sources()
+            app.state.data_pipeline_svc = svc
+            logger.info("data_pipeline_service_initialized")
+        except Exception as _svc_exc:
+            app.state.data_pipeline_svc = None
+            logger.warning("data_pipeline_service_failed error=%s", _svc_exc)
     except Exception as exc:
         logger.warning("ml_models_load_failed", error=str(exc))
         app.state.pipeline = None
@@ -266,6 +306,9 @@ async def lifespan(app: FastAPI):
         app.state.causal = None
         app.state.disease_classifier = None
         app.state.reporter = None
+        app.state.rag = None
+        app.state.fusion = None
+        app.state.data_pipeline_svc = None
         app.state.scaler = None
         app.state.feature_names = []
         app.state.dataset_stats = {}
@@ -365,6 +408,10 @@ app.include_router(pipelines.router)
 app.include_router(predictions_v2.router)
 app.include_router(reports_v2.router)
 app.include_router(features.router)
+# v3 routers
+app.include_router(literature.router)
+app.include_router(data_router.router)
+app.include_router(predictions_v3.router)
 
 
 @app.get(

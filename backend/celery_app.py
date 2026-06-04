@@ -20,4 +20,21 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="UTC",
     worker_prefetch_multiplier=1,
+    # v5 periodic tasks
+    beat_schedule={
+        # Check each data source for staleness and mark pending if > 7 days old.
+        # Runs daily at 03:00 UTC — outside peak clinical usage.
+        "v5-data-source-refresh-check": {
+            "task": "backend.tasks.check_data_source_freshness",
+            "schedule": 86400.0,  # every 24 hours
+            "options": {"expires": 3600},
+        },
+        # Recompute cohort statistics cache from real_v5.parquet.
+        # Runs weekly on Monday 04:00 UTC.
+        "v5-cohort-stats-recompute": {
+            "task": "backend.tasks.recompute_cohort_stats",
+            "schedule": 604800.0,  # every 7 days
+            "options": {"expires": 7200},
+        },
+    },
 )

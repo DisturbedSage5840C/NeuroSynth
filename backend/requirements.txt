@@ -39,3 +39,4 @@ kaggle>=1.6.17
 openneuro-py>=0.2.4
 tiktoken>=0.7.0
 biopython>=1.83
+openai>=1.30.0

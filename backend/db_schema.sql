@@ -90,3 +90,57 @@ ALTER TABLE analyses ADD COLUMN IF NOT EXISTS counterfactuals JSONB;
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS model_version TEXT;
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS confidence_intervals JSONB;
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS generated_by TEXT;  -- 'claude:model' or 'jinja2-template'
+
+-- ── v5 additions ───────────────────────────────────────────────────────────
+
+-- pgvector extension (Neon supports this natively; no-op if already enabled)
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Registry of real data source status (Kaggle, PhysioNet, OASIS, etc.)
+CREATE TABLE IF NOT EXISTS data_sources (
+    id            SERIAL PRIMARY KEY,
+    name          TEXT NOT NULL UNIQUE,
+    url           TEXT,
+    row_count     INTEGER,
+    feature_count INTEGER,
+    last_updated  TIMESTAMPTZ,
+    status        TEXT DEFAULT 'pending',   -- 'active' | 'pending' | 'error'
+    metadata      JSONB DEFAULT '{}'
+);
+
+-- PubMed abstract corpus for RAG-enhanced SOAP reports
+CREATE TABLE IF NOT EXISTS literature_embeddings (
+    id         SERIAL PRIMARY KEY,
+    pmid       TEXT NOT NULL UNIQUE,
+    title      TEXT,
+    abstract   TEXT,
+    journal    TEXT,
+    pub_year   INTEGER,
+    diseases   TEXT[],         -- e.g. ['alzheimer', 'parkinson']
+    embedding  vector(1536),   -- OpenAI text-embedding-3-small
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+-- IVFFlat index for fast approximate cosine search
+-- (created AFTER data is loaded — index on empty table is a no-op in pgvector)
+CREATE INDEX IF NOT EXISTS idx_literature_embedding
+    ON literature_embeddings
+    USING ivfflat (embedding vector_cosine_ops)
+    WITH (lists = 100);
+
+-- Cohort-level statistics cache (served to /v3/data/cohort/stats)
+CREATE TABLE IF NOT EXISTS cohort_stats (
+    id          SERIAL PRIMARY KEY,
+    stat_key    TEXT NOT NULL UNIQUE,
+    stat_value  JSONB,
+    computed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Optuna-tuned modality fusion weight history
+CREATE TABLE IF NOT EXISTS fusion_weights (
+    id           SERIAL PRIMARY KEY,
+    modality     TEXT NOT NULL,
+    weight       FLOAT,
+    optuna_trial INTEGER,
+    val_auc      FLOAT,
+    created_at   TIMESTAMPTZ DEFAULT NOW()
+);

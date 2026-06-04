@@ -1,8 +1,97 @@
+<!-- markdownlint-configure-file {"MD024": {"siblings_only": true}} -->
 # Changelog
 
 All notable changes to NeuroSynth will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+---
+
+## [5.0.0] — 2026-06-04
+
+Complete v5 upgrade across every layer: real patient data, 6-learner ensemble, CrossAttentionFusion, PubMed RAG, Neural Interface redesign, and free CI/CD deployment.
+
+### Added
+
+#### Real data pipeline
+
+- 20,000+ real patient records from 11 public datasets (Kaggle, PhysioNet, UCI, OASIS, OpenNeuro)
+- `scripts/data/v5/`: `download_kaggle.py`, `download_physionet.py`, `download_uci.py`, `scrape_openneuro.py`, `process_oasis_v5.py`, `query_gnomad.py`, `merge_v5.py`, `ctgan_augment.py`
+- `data/real_v5.parquet` — unified 56-feature schema (clinical + imaging + biomarker + wearable + genomic)
+- CTGAN augmentation for ALS and Huntington's (rare classes, ≤30% synthetic fraction)
+- Pandera schema validation in `scripts/data/v5/schema.py`
+
+#### ML architecture
+
+- `CatBoost` replaces ExtraTrees as 3rd base learner; TabNet added as 6th
+- `CrossAttentionFusion` module (`src/neurosynth/models/fusion.py`) — 2-head cross-attention over modality tokens
+- `scripts/tune_fusion_weights.py` — Optuna modality weight tuning (100 trials, 5-min budget)
+- `_PlattCalibrator` + `fit_disease_calibrators()` + `predict_disease_proba_calibrated()` in `CalibratedEnsemble`
+- `FocalLoss(γ=2)` + updated `WeightedMultiTaskLoss` in `src/neurosynth/genomic/losses.py`
+- Disease-specific TFT monotone constraints (AD: MMSE↓, ALS: FRS↓, PD: UPDRS↑)
+- `enable_mc_dropout()` / `predict_mc()` in GenomicTransformer for 20-pass MC Dropout uncertainty
+- `validate_mapie_coverage()` in `scripts/train_v5.py` (asserts ≥93% empirical coverage)
+- `DiseaseClassifierV5` (CatBoost 6-class) + `_V5PredictorAdapter` in model registry
+
+#### RAG pipeline
+
+- `scripts/data/v5/build_pubmed_corpus.py` — E-utilities fetcher for 10k neuro abstracts
+- `scripts/data/v5/embed_corpus.py` — OpenAI `text-embedding-3-small` → Neon pgvector
+- `src/neurosynth/llm/rag_v2.py` — `PubMedRAG` class (sync+async retrieve, hallucination guard)
+- `backend/report_generator_v4.py` — RAG-enhanced SOAP with inline PMID citations
+
+#### Frontend redesign
+
+- Neural Interface dark theme: `--bg-base: #060b18`, `--accent-primary: #00d4ff`, disease color system
+- `LandingPage` — Three.js procedural neural network canvas (52-node, seeded LCG, 3 nearest-neighbor edges)
+- `LoginPage` — glassmorphism card, role selector, Framer Motion entrance animation
+- `Layout` — icon rail nav, v5 route section divider
+- Design system: `GlassCard`, `DataBadge`, `RiskChip`, `RiskScoreGaugeV3`, `SHAPWaterfallV3`, `TrajectoryChartV3`
+- 5 new pages: `CohortDashboard`, `DataPipeline`, `LiteratureSearch`, `BrainAtlas`, `Settings`
+- `TrajectoryChartV3` — intervention scenario mode with Physical Activity / Sleep Quality / BMI sliders
+- `BrainVisualization3D` v2 — 116-region AAL atlas (MNI-positioned), disease-focus mode, click-to-inspect
+- Design system extras: `ClinicalInput`, `SectionHeading`, `PulseIndicator`, `CytoscapeGraph` (D3 force-directed causal graph), `TimelineItem`
+- `frontend/src/lib/aalAtlas.ts` — AAL-116 region definitions with feature→region mapping
+
+#### Backend v3 API
+
+- `backend/models_v3.py` — `AnalyzeResponseV3`, `CohortStatsResponse`, `DataSourceStatus`, `FusionWeightsResponse`
+- `backend/routers/data.py` — `GET /v3/data/sources`, `POST /v3/data/refresh/{source}`, `GET /v3/data/cohort/stats`, `GET /v3/data/provenance`
+- `backend/routers/predictions_v3.py` — `POST /v3/predictions/analyze`, `GET /v3/fusion/weights`
+- `backend/routers/literature.py` — `POST /v3/literature/search`, `GET /v3/literature/cite/{pmid}`, `GET /v3/literature/status`
+- `backend/services/data_pipeline_service.py` — `DataPipelineService` with source seeding, cohort stats, provenance
+- `backend/db_schema.sql` — pgvector extension, `literature_embeddings` (ivfflat index), `data_sources`, `cohort_stats`, `fusion_weights` tables
+- CrossAttentionFusion loaded to `app.state.fusion` on lifespan startup
+- Daily Celery beat: `check_data_source_freshness` (03:00 UTC) + `recompute_cohort_stats` (weekly)
+
+#### Deployment
+
+- `.github/workflows/train-validate-v5.yml` — 5-job CI: data → train + embed → upload → deploy
+- `render.yaml` — embed-worker service (PubMed corpus build + pgvector import)
+- `frontend/vercel.json` — SPA rewrites, asset cache headers, security headers
+- `Dockerfile` / `Dockerfile.model` upgraded to Python 3.12 + `PYTHONPATH=/app:/app/src`
+- `backend/requirements-deploy.txt` — catboost, pgvector, openai, tiktoken, biopython added
+- `pyproject.toml` — `[v5]` optional-dependencies group
+- `DEPLOYMENT.md` — GitHub Actions secrets table (10 required + 4 optional), Neon pgvector setup
+
+#### Observability and QA
+
+- `/ready` endpoint extended: `rag_enabled`, `fusion_loaded`, `pgvector_ok`, `schema_version`
+- `scripts/load_test.py` — v3 user class + v3 stress targets; p95 ≤ 2s at 50 concurrent users
+- `tests/integration/test_v3_endpoints.py` — 18 integration tests for all new v3 endpoints + unit tests for `_PlattCalibrator` and `DataPipelineService`
+
+### Changed
+
+- `CalibratedEnsemble` — ExtraTrees replaced by CatBoost; TabNet added as 6th learner
+- `DiseaseClassifier` — RandomForest replaced by CatBoost with per-disease Platt calibration
+- `backend/celery_app.py` — added `beat_schedule` for v5 periodic tasks
+- `dvc.yaml` — 4 v5 data stages + 2 corpus stages
+- README — updated for v5 (AUC target, architecture, 6-learner table, v3 API reference)
+
+### Fixed
+
+- `tsc --noEmit` passes clean across all new frontend components (zero TypeScript errors)
+- Disease color inline-style linter warnings resolved via `dc-text-*` / `dc-bg-*` CSS classes
 
 ---
 

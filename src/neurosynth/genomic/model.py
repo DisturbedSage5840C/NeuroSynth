@@ -196,3 +196,55 @@ class HierarchicalVariantTransformer(nn.Module):
             "variant_importance": variant_importance,
         }
         return out
+
+    # ------------------------------------------------------------------
+    # MC Dropout inference
+    # ------------------------------------------------------------------
+
+    def enable_mc_dropout(self) -> None:
+        """Set all dropout layers to training mode for MC Dropout inference.
+
+        Call this before running n_passes of forward() at inference time to
+        get a distribution over predictions rather than a point estimate.
+        All other layers (LayerNorm, Linear) stay in eval mode.
+        """
+        self.eval()
+        for m in self.modules():
+            if isinstance(m, nn.Dropout):
+                m.train()
+
+    def disable_mc_dropout(self) -> None:
+        """Restore full eval mode (disable MC Dropout)."""
+        self.eval()
+
+    @torch.no_grad()
+    def predict_mc(self, *args, n_passes: int = 20, **kwargs) -> dict[str, torch.Tensor]:
+        """Run n_passes stochastic forward passes and return mean + std.
+
+        Returns a dict with every key from forward() plus:
+          - ``<key>_std``: per-output standard deviation across passes
+          - ``mc_passes``: number of stochastic passes used
+
+        Usage:
+            model.enable_mc_dropout()
+            result = model.predict_mc(variant_features, ..., n_passes=20)
+            model.disable_mc_dropout()
+        """
+        results: list[dict] = []
+        for _ in range(n_passes):
+            results.append(self(*args, **kwargs))
+
+        # Stack scalar/tensor outputs across passes and compute statistics
+        keys = [k for k in results[0] if isinstance(results[0][k], torch.Tensor)]
+        aggregated: dict[str, torch.Tensor] = {}
+        for k in keys:
+            stacked = torch.stack([r[k] for r in results], dim=0)  # (passes, ...)
+            aggregated[k] = stacked.mean(dim=0)
+            aggregated[f"{k}_std"] = stacked.std(dim=0)
+
+        aggregated["mc_passes"] = torch.tensor(n_passes)
+        # Keep list outputs (gene_attention, variant_importance) from the last pass
+        for k in results[0]:
+            if k not in aggregated:
+                aggregated[k] = results[-1][k]
+        return aggregated

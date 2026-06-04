@@ -359,3 +359,32 @@ class DiseaseClassifier:
             "disease_probabilities": all_probs,
             "confidence": confidence,
         }
+
+
+class DiseaseClassifierV5:
+    """Duck-type compatible wrapper around the v5 CatBoost disease classifier."""
+
+    def __init__(self, clf, le, feature_names: list[str]) -> None:
+        self.clf = clf
+        self.le = le
+        self.feature_names = feature_names
+
+    def predict_disease(self, patient_features: dict) -> dict:
+        row = np.array(
+            [[float(patient_features.get(f, 0.0)) for f in self.feature_names]],
+            dtype=float,
+        )
+        probs = self.clf.predict_proba(row)[0]
+        pred_idx = int(np.argmax(probs))
+        pred_disease = self.le.inverse_transform([pred_idx])[0]
+        all_probs = {
+            self.le.inverse_transform([i])[0]: round(float(p), 4)
+            for i, p in enumerate(probs)
+        }
+        top_prob = float(probs[pred_idx])
+        confidence = "High" if top_prob > 0.6 else "Medium" if top_prob > 0.4 else "Low"
+        return {
+            "predicted_disease": pred_disease,
+            "disease_probabilities": all_probs,
+            "confidence": confidence,
+        }

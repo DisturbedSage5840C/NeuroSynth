@@ -5,13 +5,48 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class FocalLoss(nn.Module):
+    """Focal loss for class-imbalanced neurological disease classification.
+
+    γ=2 down-weights well-classified examples so the model focuses on rare
+    disease cases (ALS, Huntington's) rather than the easy majority class.
+    Replaces plain cross-entropy in the clinical diagnosis head.
+    """
+
+    def __init__(self, gamma: float = 2.0, weight: torch.Tensor | None = None) -> None:
+        super().__init__()
+        self.gamma = gamma
+        self.register_buffer("weight", weight)
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        log_probs = F.log_softmax(logits, dim=-1)
+        probs = log_probs.exp()
+        # Gather the log-probability and probability of the correct class
+        log_p = log_probs.gather(1, targets.unsqueeze(1)).squeeze(1)
+        p = probs.gather(1, targets.unsqueeze(1)).squeeze(1)
+        focal_weight = (1.0 - p) ** self.gamma
+        loss = -focal_weight * log_p
+        if self.weight is not None:
+            class_w = self.weight.gather(0, targets)
+            loss = loss * class_w
+        return loss.mean()
+
+
 class WeightedMultiTaskLoss(nn.Module):
-    def __init__(self, w_clinical: float = 1.0, w_prs: float = 0.3, w_apoe: float = 0.5, w_dirichlet_kl: float = 0.1) -> None:
+    def __init__(
+        self,
+        w_clinical: float = 1.0,
+        w_prs: float = 0.3,
+        w_apoe: float = 0.5,
+        w_dirichlet_kl: float = 0.1,
+        focal_gamma: float = 2.0,
+    ) -> None:
         super().__init__()
         self.w_clinical = w_clinical
         self.w_prs = w_prs
         self.w_apoe = w_apoe
         self.w_dirichlet_kl = w_dirichlet_kl
+        self._focal = FocalLoss(gamma=focal_gamma)
 
     def _dirichlet_kl(self, alpha: torch.Tensor) -> torch.Tensor:
         k = alpha.shape[-1]
@@ -25,7 +60,7 @@ class WeightedMultiTaskLoss(nn.Module):
         return (term1 + term2 + term3).mean()
 
     def forward(self, outputs: dict[str, torch.Tensor], labels: dict[str, torch.Tensor]) -> tuple[torch.Tensor, dict[str, float]]:
-        clinical = F.cross_entropy(outputs["diagnosis_logits"], labels["diagnosis_class"])
+        clinical = self._focal(outputs["diagnosis_logits"], labels["diagnosis_class"])
         prs = F.mse_loss(outputs["prs_pred"], labels["prs"])
         apoe = F.cross_entropy(outputs["apoe_logits"], labels["apoe_count"])
         kl = self._dirichlet_kl(outputs["dirichlet_alpha"])

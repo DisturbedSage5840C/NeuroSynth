@@ -117,6 +117,20 @@ monitoring-advanced = [
   "evidently==0.4.37",
 ]
 
+# v5 ML + RAG additions — install with: pip install -e '.[v5]'
+v5 = [
+  "catboost>=1.2.7",
+  "pytorch-tabnet>=4.1.0",
+  "pgvector>=0.2.5",
+  "openai>=1.30.0",
+  "tiktoken>=0.7.0",
+  "ctgan>=0.7.5",
+  "wfdb>=4.1.0",
+  "openneuro-py>=0.2.4",
+  "lightgbm>=4.3",
+  "mapie>=0.8.0",
+]
+
 full = [
   "torch-geometric==2.5.3",
   "torch-scatter==2.1.2",
@@ -126,6 +140,16 @@ full = [
   "hail==0.2.131",
   "econml==0.14.1",
   "evidently==0.4.37",
+  "catboost>=1.2.7",
+  "pytorch-tabnet>=4.1.0",
+  "pgvector>=0.2.5",
+  "openai>=1.30.0",
+  "tiktoken>=0.7.0",
+  "ctgan>=0.7.5",
+  "wfdb>=4.1.0",
+  "openneuro-py>=0.2.4",
+  "lightgbm>=4.3",
+  "mapie>=0.8.0",
   "pytest==8.3.2",
   "pytest-asyncio==0.23.8",
   "pytest-timeout==2.3.1",

@@ -100,7 +100,10 @@ def _try_openneuro_py(dsid: str, out_dir: Path) -> pd.DataFrame | None:
 
 
 def _scaffold(n: int, disease_type: str, data_source: str) -> pd.DataFrame:
-    df = pd.DataFrame({col: [POP_DEFAULTS.get(col, np.nan)] * n for col in ALL_FEATURES})
+    # Use NaN for all features — only genomic priors and observed columns will be filled.
+    # Leaving unknown features as NaN is more honest than imputing population defaults here;
+    # merge_v5.py fills medians after all sources are combined.
+    df = pd.DataFrame({col: [np.nan] * n for col in ALL_FEATURES})
     genomic = DISEASE_GENOMIC_PRIORS.get(disease_type, DISEASE_GENOMIC_PRIORS["Alzheimer's Disease"])
     for col, val in genomic.items():
         df[col] = val
@@ -157,8 +160,9 @@ def process_participants_tsv(
             "huntington": "Huntington's Disease",
         }
         for idx, label_val in enumerate(labels):
+            label_str = str(label_val) if label_val is not None else ""
             for key, disease in disease_keywords.items():
-                if key in label_val and is_case.iloc[idx]:
+                if key in label_str and is_case.iloc[idx]:
                     df.loc[idx, "DiseaseType"] = disease
                     break
     else:

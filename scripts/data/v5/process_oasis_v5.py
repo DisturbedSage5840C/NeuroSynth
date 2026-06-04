@@ -45,6 +45,14 @@ from scripts.data.v5.schema import (
 
 _OASIS_RAW_DIR = Path("data/raw/oasis")
 
+
+def _read_tabular(path: Path) -> pd.DataFrame:
+    """Read CSV or Excel file transparently."""
+    if path.suffix in (".xlsx", ".xls"):
+        return pd.read_excel(path)
+    sep = "\t" if path.suffix == ".tsv" else ","
+    return pd.read_csv(path, sep=sep)
+
 # CDR → derived clinical feature mappings (clinically grounded)
 def _cdr_to_features(cdr: pd.Series) -> dict[str, pd.Series]:
     return {
@@ -76,7 +84,7 @@ def process_oasis1(path: Path) -> pd.DataFrame:
     """
     OASIS-1 columns: ID, M/F, Hand, Age, Educ, SES, MMSE, CDR, eTIV, nWBV, ASF, Delay
     """
-    raw = pd.read_csv(path)
+    raw = _read_tabular(path)
     print(f"[oasis1] raw: {raw.shape}, cols: {list(raw.columns)}")
     n = len(raw)
     df = _scaffold(n, "Alzheimer's Disease", "oasis1")
@@ -123,7 +131,7 @@ def process_oasis2(path: Path) -> pd.DataFrame:
                      Age, EDUC, SES, MMSE, CDR, eTIV, nWBV, ASF
     Take first visit per subject to avoid duplication (or use all visits for more rows).
     """
-    raw = pd.read_csv(path)
+    raw = _read_tabular(path)
     print(f"[oasis2] raw: {raw.shape}, cols: {list(raw.columns)}")
 
     # Use all visits (longitudinal rows are distinct clinical snapshots)
@@ -323,22 +331,50 @@ def process_oasis3(oasis3_dir: Path) -> pd.DataFrame:
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
+def _find_oasis_file(default_csv: Path, subdir: str, stem_keywords: list[str]) -> Path | None:
+    """Auto-discover an OASIS file — checks default CSV path, then subdir for CSV/XLSX."""
+    if default_csv.exists():
+        return default_csv
+    # Check subdir for any file matching the keywords
+    subdir_path = _OASIS_RAW_DIR / subdir
+    if subdir_path.exists():
+        for f in subdir_path.iterdir():
+            if f.suffix in (".csv", ".xlsx", ".xls", ".tsv"):
+                name_lower = f.stem.lower()
+                if any(kw in name_lower for kw in stem_keywords):
+                    return f
+        # Fallback: return first tabular file in subdir
+        for f in subdir_path.iterdir():
+            if f.suffix in (".csv", ".xlsx", ".xls", ".tsv"):
+                return f
+    return None
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Process OASIS-1/2/3 into v5 schema")
-    ap.add_argument("--oasis1", default=str(_OASIS_RAW_DIR / "oasis_cross-sectional.csv"))
-    ap.add_argument("--oasis2", default=str(_OASIS_RAW_DIR / "oasis_longitudinal.csv"))
+    ap.add_argument("--oasis1", default=None, help="Path to OASIS-1 CSV/XLSX (auto-detected if omitted)")
+    ap.add_argument("--oasis2", default=None, help="Path to OASIS-2 CSV/XLSX (auto-detected if omitted)")
     ap.add_argument("--oasis3-dir", default=str(_OASIS_RAW_DIR / "OASIS3"))
     ap.add_argument("--out", default="data/oasis_v5.parquet")
     args = ap.parse_args()
 
+    # Auto-discover files if not explicitly provided
+    oasis1_path = Path(args.oasis1) if args.oasis1 else _find_oasis_file(
+        _OASIS_RAW_DIR / "oasis_cross-sectional.csv", "oasis1",
+        ["cross", "oasis1", "oasis_1", "cross_sectional"],
+    )
+    oasis2_path = Path(args.oasis2) if args.oasis2 else _find_oasis_file(
+        _OASIS_RAW_DIR / "oasis_longitudinal.csv", "oasis2",
+        ["longitudinal", "oasis2", "oasis_2"],
+    )
+
     frames: list[pd.DataFrame] = []
 
-    for label, path_str, processor in [
-        ("OASIS-1", args.oasis1, process_oasis1),
-        ("OASIS-2", args.oasis2, process_oasis2),
+    for label, p, processor in [
+        ("OASIS-1", oasis1_path, process_oasis1),
+        ("OASIS-2", oasis2_path, process_oasis2),
     ]:
-        p = Path(path_str)
-        if p.exists():
+        if p and p.exists():
             print(f"\n=== {label}: {p} ===")
             try:
                 df = processor(p)

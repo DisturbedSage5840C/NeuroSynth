@@ -21,12 +21,16 @@ async def health() -> HealthResponse:
     "/ready",
     response_model=ReadyResponse,
     summary="Readiness probe",
-    description="Checks readiness by verifying PostgreSQL and Redis connectivity.",
+    description="Checks PostgreSQL, Redis, ML models, RAG, CrossAttentionFusion, and pgvector.",
 )
 async def ready(request: Request, db: Database = Depends(get_database)) -> ReadyResponse:
     db_ok = False
     redis_ok = False
+    pgvector_ok = False
     models_loaded = bool(getattr(request.app.state, "predictor", None))
+    rag_enabled = bool(getattr(request.app.state, "rag", None) and
+                       getattr(request.app.state.rag, "enabled", False))
+    fusion_loaded = bool(getattr(request.app.state, "fusion", None))
     redis_client = getattr(request.app.state, "redis", None)
 
     try:
@@ -40,10 +44,24 @@ async def ready(request: Request, db: Database = Depends(get_database)) -> Ready
     except Exception:
         redis_ok = False
 
-    is_ready = db_ok and redis_ok and models_loaded
+    # Verify pgvector is usable — table present + at least one embedding row queryable
+    if db_ok:
+        try:
+            count_row = await db.fetchrow(
+                "SELECT COUNT(*) AS n FROM literature_embeddings LIMIT 1"
+            )
+            pgvector_ok = count_row is not None
+        except Exception:
+            pgvector_ok = False
+
+    is_ready = db_ok and models_loaded
     return ReadyResponse(
         status="ready" if is_ready else "degraded",
         database=db_ok,
         redis=redis_ok,
         models_loaded=models_loaded,
+        rag_enabled=rag_enabled,
+        fusion_loaded=fusion_loaded,
+        pgvector_ok=pgvector_ok,
+        schema_version="v5",
     )

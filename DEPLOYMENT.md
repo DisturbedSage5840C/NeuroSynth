@@ -95,3 +95,60 @@ docker-compose up --build     # api :8000 · frontend :3000 · postgres · redis
   verifies stated risk percentages against the model output.
 - **Demo mode:** if the frontend is hosted without `VITE_API_BASE_URL`, it serves
   realistic demo data so the UI is fully explorable without a backend.
+
+---
+
+## v5 CI/CD — GitHub Actions Secrets
+
+The `train-validate-v5.yml` workflow self-skips any step whose secret is absent,
+so you can activate features incrementally. Add secrets at:
+**repo → Settings → Secrets and variables → Actions → New repository secret**
+
+### Required for full pipeline
+
+| Secret | Description | Where to get it |
+| --- | --- | --- |
+| `KAGGLE_USERNAME` | Kaggle account username | kaggle.com → Settings → API |
+| `KAGGLE_KEY` | Kaggle API token | kaggle.com → Settings → API → Create New Token |
+| `R2_ACCOUNT_ID` | Cloudflare account ID | Cloudflare dashboard → R2 → Overview |
+| `R2_ACCESS_KEY_ID` | R2 API key ID | R2 → Manage R2 API Tokens |
+| `R2_SECRET_ACCESS_KEY` | R2 API key secret | Same token creation flow |
+| `R2_BUCKET` | R2 bucket name (default: `neurosynth-models`) | Create bucket in R2 console |
+| `RENDER_DEPLOY_HOOK_URL` | Render redeploy webhook | Render service → Settings → Deploy Hook |
+| `VERCEL_TOKEN` | Vercel deploy token | vercel.com → Settings → Tokens |
+| `VERCEL_ORG_ID` | Vercel team/org ID | vercel.com → Settings → General |
+| `VERCEL_PROJECT_ID` | Vercel project ID | Project → Settings → General |
+
+### Optional (enable incrementally)
+
+| Secret | Description | Effect when absent |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | OpenAI API key | RAG corpus embedding skipped; literature search disabled |
+| `NCBI_API_KEY` | NCBI E-utilities key | PubMed rate-limited to 3 req/s instead of 10 req/s |
+| `VITE_API_BASE_URL` | Deployed backend URL | Frontend build uses relative URLs; smoke test skipped |
+| `ANTHROPIC_API_KEY` | Claude API key | SOAP reports use deterministic template fallback |
+
+### v5 environment variables (set on Render service)
+
+After Render deploy, add these in the Render dashboard → Environment:
+
+```sh
+OPENAI_API_KEY=sk-...          # RAG literature search in reports
+RAG_ENABLED=1                  # Enable pgvector RAG (set after embed-worker runs)
+NCBI_API_KEY=...               # Optional: higher PubMed rate limit
+KAGGLE_USERNAME=...            # Data refresh jobs
+KAGGLE_KEY=...                 # Data refresh jobs
+```
+
+### One-time pgvector setup on Neon
+
+After creating your Neon database, run this once:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+Then run `db_schema.sql` to create all tables including `literature_embeddings`.
+
+The Render **embed-worker** service handles this automatically on first deploy once
+`OPENAI_API_KEY` and `NEUROSYNTH_POSTGRES_DSN` are set.

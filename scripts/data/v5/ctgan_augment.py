@@ -29,7 +29,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from scripts.data.v5.schema import ALL_FEATURES, META_COLS
+from scripts.data.v5.schema import (
+    ALL_FEATURES, META_COLS, DISEASE_GENOMIC_PRIORS, POP_DEFAULTS, DISEASE_TYPES,
+)
 
 # Augmentation thresholds
 MIN_REAL_SAMPLES = 200     # augment classes below this count
@@ -82,11 +84,16 @@ def augment_class(
     # Prepare training data: features only (no meta columns in CTGAN input)
     X = real_rows[feature_cols].copy()
 
+    # Drop columns that are entirely NaN (CTGAN cannot train on them)
+    non_null_cols = X.columns[X.notna().any()].tolist()
+    X = X[non_null_cols]
+
     # CTGAN requires float for continuous, discrete_columns for categoricals
     discrete_in_data = [c for c in _DISCRETE_COLUMNS if c in X.columns]
 
-    # Fill NaN with column median before feeding to CTGAN (CTGAN doesn't handle NaN)
-    X = X.fillna(X.median(numeric_only=True))
+    # Fill remaining NaN with column median before feeding to CTGAN (CTGAN doesn't handle NaN)
+    col_medians = X.median(numeric_only=True)
+    X = X.fillna(col_medians).fillna(0)  # second fillna handles all-NaN-median cols
 
     ctgan = CTGAN(
         epochs=_CTGAN_EPOCHS,
@@ -99,7 +106,7 @@ def augment_class(
     synth_X = ctgan.sample(n_synth, condition_column=None)
     synth_X = synth_X.reset_index(drop=True)
 
-    # Reconstruct full schema rows
+    # Reconstruct full schema rows (fill non-trained columns with NaN)
     synth_df = pd.DataFrame(index=range(n_synth))
     for col in feature_cols:
         if col in synth_X.columns:
@@ -117,6 +124,34 @@ def augment_class(
     return synth_df
 
 
+def generate_from_priors(disease_type: str, n: int, seed: int = 42) -> pd.DataFrame:
+    """
+    Generate synthetic rows for a disease with 0 real samples using schema priors.
+    Used for Huntington's Disease which has no real training data available.
+    """
+    rng = np.random.default_rng(seed)
+    rows = []
+    priors = DISEASE_GENOMIC_PRIORS.get(disease_type, {})
+    for _ in range(n):
+        row = {col: POP_DEFAULTS.get(col, np.nan) for col in ALL_FEATURES}
+        row.update(priors)
+        # Jitter continuous features ±15% to create variety
+        for col, val in row.items():
+            if col in _DISCRETE_COLUMNS or not isinstance(val, (int, float)):
+                continue
+            if np.isfinite(val) and val != 0:
+                row[col] = float(val) + rng.normal(0, abs(val) * 0.15)
+        row["DiseaseType"] = disease_type
+        row["risk_label"] = 1
+        row["data_source"] = "prior_augmented"
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    # Clip age to valid range
+    if "Age" in df.columns:
+        df["Age"] = df["Age"].clip(30, 90)
+    return df
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="CTGAN augmentation for rare disease classes")
     ap.add_argument("--input", default="data/real_v5.parquet")
@@ -127,8 +162,10 @@ def main() -> None:
                     help=f"Max synthetic fraction of final class size (default: {MAX_SYNTHETIC_FRACTION})")
     ap.add_argument("--epochs", type=int, default=_CTGAN_EPOCHS)
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--diseases", nargs="+", default=["ALS", "Huntington's Disease"],
-                    help="Disease types to augment (default: ALS + Huntington's Disease)")
+    ap.add_argument("--diseases", nargs="+",
+                    default=["ALS", "Huntington's Disease", "Epilepsy",
+                             "Multiple Sclerosis", "Healthy"],
+                    help="Disease types to augment (default: all rare classes)")
     args = ap.parse_args()
 
     input_path = Path(args.input)
@@ -158,7 +195,13 @@ def main() -> None:
         n_real = int((~disease_rows["is_synthetic"]).sum())
 
         if n_real == 0:
-            print(f"\n[{disease}] no real samples found — skipping")
+            # No real data: generate from disease-specific schema priors + jitter
+            n_to_generate = min(args.min_samples, int(args.min_samples * args.max_fraction))
+            print(f"\n[{disease}] 0 real samples — generating {n_to_generate} from schema priors")
+            synth_df = generate_from_priors(disease, n_to_generate, args.seed)
+            synth_df["is_synthetic"] = True
+            augmented_frames.append(synth_df)
+            total_synth += len(synth_df)
             continue
 
         if n_real >= args.min_samples:
