@@ -169,4 +169,4 @@ where = ["src"]
 # clean failure instead of stalling the whole CI job. Per-test marks override.
 addopts = "-q --cov=neurosynth --cov-report=term-missing --timeout=60"
 asyncio_mode = "auto"
-timeout_method = "thread"
+timeout_method = "signal"
