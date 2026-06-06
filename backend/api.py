@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os as _os
 import subprocess
 import sys
 import time
@@ -221,7 +222,12 @@ async def lifespan(app: FastAPI):
         logger.warning("database_connect_failed", error=str(exc))
 
     try:
-        app.state.redis = Redis.from_url(settings.redis_url, decode_responses=True)
+        app.state.redis = Redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+        )
         await app.state.redis.ping()
         logger.info("redis_connected")
     except Exception as exc:
@@ -344,14 +350,23 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
+    allow_origin_regex=r"http://localhost:\d+" if settings.app_env == "dev" else None,
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
 )
 
 
+_DEV_BYPASS_AUTH = _os.getenv("DEV_BYPASS_AUTH", "").lower() in ("1", "true", "yes")
+
 @app.middleware("http")
 async def auth_context_middleware(request: Request, call_next):
+    # DEV_BYPASS_AUTH=true — inject a dev superuser so all endpoints work locally
+    # without a running database. Never set this in production.
+    if _DEV_BYPASS_AUTH:
+        request.state.user = {"user_id": "dev-local", "role": "ADMIN"}
+        return await call_next(request)
+
     token = request.cookies.get(ACCESS_COOKIE)
     request.state.user = None
     if token:

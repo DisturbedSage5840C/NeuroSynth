@@ -33,6 +33,7 @@ class Database:
             dsn=settings.postgres_dsn,
             min_size=1,
             max_size=10,
+            timeout=5,
             command_timeout=10,
             init=_init_pgvector,
         )

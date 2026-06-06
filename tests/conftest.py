@@ -103,11 +103,25 @@ def fake_redis():
 
 @pytest.fixture
 def api_client(monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+    from unittest.mock import AsyncMock, MagicMock, patch
+
     from backend import api as api_module
 
     async def _no_drain(timeout_seconds: int = 20) -> None:
         _ = timeout_seconds
 
     monkeypatch.setattr(api_module, "_drain_celery_queue", _no_drain)
-    with TestClient(api_module.app) as client:
-        yield client
+
+    with (
+        patch("backend.db.Database.connect", new_callable=AsyncMock),
+        patch("backend.db.Database.disconnect", new_callable=AsyncMock),
+        patch("backend.api.Redis") as mock_redis_cls,
+    ):
+        mock_redis_instance = MagicMock()
+        mock_redis_instance.ping = AsyncMock()
+        mock_redis_instance.close = AsyncMock()
+        mock_redis_instance.llen = AsyncMock(return_value=0)
+        mock_redis_cls.from_url.return_value = mock_redis_instance
+
+        with TestClient(api_module.app) as client:
+            yield client

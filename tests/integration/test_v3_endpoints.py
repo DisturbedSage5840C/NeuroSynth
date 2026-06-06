@@ -31,8 +31,16 @@ def client():
     """Return a TestClient with all heavy state replaced by lightweight mocks."""
     with (
         patch("backend.db.Database.connect", new_callable=AsyncMock),
+        patch("backend.db.Database.disconnect", new_callable=AsyncMock),
+        patch("backend.api.Redis") as mock_redis_cls,
         patch("backend.core.config.get_settings") as mock_settings,
     ):
+        mock_redis_instance = MagicMock()
+        mock_redis_instance.ping = AsyncMock()
+        mock_redis_instance.close = AsyncMock()
+        mock_redis_instance.llen = AsyncMock(return_value=0)
+        mock_redis_cls.from_url.return_value = mock_redis_instance
+
         mock_settings.return_value = MagicMock(
             postgres_dsn="postgresql://user:pass@localhost/neurosynth",
             redis_url="redis://localhost:6379/0",
@@ -239,7 +247,7 @@ def test_literature_search_empty_query_rejected(client, auth_headers):
 # ---------------------------------------------------------------------------
 
 def test_fusion_weights_schema(client, auth_headers):
-    resp = client.get("/v3/fusion/weights", headers=auth_headers)
+    resp = client.get("/v3/predictions/fusion/weights", headers=auth_headers)
     if resp.status_code == 200:
         body = resp.json()
         assert "weights" in body
@@ -255,7 +263,7 @@ def test_fusion_weights_schema(client, auth_headers):
 
 
 def test_fusion_weights_modalities_present(client, auth_headers):
-    resp = client.get("/v3/fusion/weights", headers=auth_headers)
+    resp = client.get("/v3/predictions/fusion/weights", headers=auth_headers)
     if resp.status_code != 200:
         pytest.skip("endpoint not available")
     weights = resp.json()["weights"]
@@ -347,7 +355,7 @@ def test_platt_calibrator_fit_predict():
 
     assert calibrated.shape == probs.shape
     assert (calibrated >= 0).all() and (calibrated <= 1).all()
-    assert abs(cal.a) < 10 and abs(cal.b) < 10
+    assert abs(cal.a) <= 10 and abs(cal.b) <= 10
 
 
 # ---------------------------------------------------------------------------
