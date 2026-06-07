@@ -34,6 +34,12 @@ def client():
         patch("backend.db.Database.disconnect", new_callable=AsyncMock),
         patch("backend.api.Redis") as mock_redis_cls,
         patch("backend.core.config.get_settings") as mock_settings,
+        # Prevent the lifespan from spawning a pretrain subprocess — on a cold CI
+        # runner, Python startup + importing torch/lightgbm alone takes 30-50s.
+        patch("backend.api._manifest_valid", return_value=True),
+        # Prevent model-file I/O and heavy ML lib imports during test startup.
+        patch("backend.model_registry.ModelRegistry"),
+        patch("backend.report_generator_v4.ClinicalReportGeneratorV4"),
     ):
         mock_redis_instance = MagicMock()
         mock_redis_instance.ping = AsyncMock()
