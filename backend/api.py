@@ -200,6 +200,26 @@ async def _keepalive_ping(logger) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import os as _os_li
+    if _os_li.getenv("TESTING"):
+        # Fast path for the test suite — skip all network I/O, heavy ML imports,
+        # and subprocess launches.  Tests that need specific app.state values
+        # inject them directly after TestClient.__enter__() returns.
+        for _attr in ("predictor", "multi_predictor", "temporal", "causal",
+                      "disease_classifier", "reporter", "rag", "fusion",
+                      "data_pipeline_svc", "scaler", "pipeline"):
+            setattr(app.state, _attr, None)
+        app.state.feature_names = []
+        app.state.dataset_stats = {}
+        app.state.metrics = {}
+        app.state.models_loaded = False
+        app.state.redis = None
+        _keepalive = asyncio.create_task(asyncio.sleep(0))
+        app.state.keepalive_task = _keepalive
+        yield
+        _keepalive.cancel()
+        return
+
     settings = get_settings()
     configure_structlog()
     logger = get_logger("neurosynth.bootstrap")

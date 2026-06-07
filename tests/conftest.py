@@ -5,6 +5,10 @@ import os
 # Must be set before any C-extension import (LightGBM, torch, sklearn) to avoid
 # the OpenMP duplicate-library segfault when they're loaded in the same process.
 os.environ.setdefault("OMP_NUM_THREADS", "1")
+# Activates the fast-path in backend.api.lifespan — skips DB/Redis connections,
+# pretrain subprocess, and all heavy ML imports.  Individual fixtures inject the
+# specific app.state they need after TestClient starts.
+os.environ.setdefault("TESTING", "1")
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
