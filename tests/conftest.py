@@ -5,10 +5,32 @@ import os
 # Must be set before any C-extension import (LightGBM, torch, sklearn) to avoid
 # the OpenMP duplicate-library segfault when they're loaded in the same process.
 os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 # Activates the fast-path in backend.api.lifespan — skips DB/Redis connections,
 # pretrain subprocess, and all heavy ML imports.  Individual fixtures inject the
 # specific app.state they need after TestClient starts.
 os.environ.setdefault("TESTING", "1")
+# Prevent locust.__init__ from calling gevent.monkey.patch_all() if locust is
+# ever imported during the test session.
+os.environ.setdefault("LOCUST_SKIP_MONKEY_PATCH", "1")
+
+# Belt-and-suspenders: stub out gevent.monkey patch functions so they become
+# no-ops for the entire session.  gevent.monkey.patch_all() replaces
+# threading.Lock with a gevent semaphore; without a running gevent hub,
+# anyio's TestClient then deadlocks at start_blocking_portal → thread.join().
+try:
+    import gevent.monkey as _gm  # type: ignore[import-untyped]
+    _gm.patch_all = lambda *_a, **_kw: None  # type: ignore[assignment]
+    _gm.patch_thread = lambda *_a, **_kw: None  # type: ignore[assignment]
+    _gm.patch_socket = lambda *_a, **_kw: None  # type: ignore[assignment]
+    _gm.patch_os = lambda *_a, **_kw: None  # type: ignore[assignment]
+    _gm.patch_time = lambda *_a, **_kw: None  # type: ignore[assignment]
+    _gm.patch_sys = lambda *_a, **_kw: None  # type: ignore[assignment]
+    del _gm
+except ImportError:
+    pass
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
