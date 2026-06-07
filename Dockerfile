@@ -29,7 +29,6 @@ RUN pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/   ./backend/
 COPY src/        ./src/
 COPY scripts/    ./scripts/
-COPY app.py      ./app.py
 
 # Frontend static assets served by the API (optional; Vercel serves these separately)
 COPY --from=frontend-builder /frontend/dist ./static
