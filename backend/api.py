@@ -55,21 +55,23 @@ def _md5(path: Path) -> str:
 
 
 def _manifest_valid(models_dir: Path, dataset_file: Path) -> bool:
+    """Return True when pre-trained artifacts are present and consistent.
+
+    Dataset presence/MD5 is only checked when the file actually exists —
+    cloud deploys ship model artifacts without training data, which is fine.
+    """
     _log = logging.getLogger("neurosynth.bootstrap")
     manifest_file = models_dir / "model_manifest.json"
     if not manifest_file.exists():
         _log.warning("manifest_check_failed: manifest file missing at %s", manifest_file)
         return False
-    if not dataset_file.exists():
-        _log.warning("manifest_check_failed: dataset file missing at %s", dataset_file)
-        return False
 
+    # Core artifacts required for inference (v5 path; rf_model.pkl only needed
+    # as legacy fallback when ensemble_v5/ is absent).
     required = [
         "scaler.pkl",
-        "rf_model.pkl",
         "gb_model.pkl",
         "lr_model.pkl",
-        "lstm_model.pt",
         "causal_graph.npy",
         "disease_clf.pkl",
         "disease_le.pkl",
@@ -80,20 +82,22 @@ def _manifest_valid(models_dir: Path, dataset_file: Path) -> bool:
             _log.warning("manifest_check_failed: required artifact missing: %s", file_name)
             return False
 
-    try:
-        manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-    except Exception as e:
-        _log.warning("manifest_check_failed: corrupt manifest JSON: %s", e)
-        return False
+    # Dataset MD5 check only when training data is present (local dev / CI).
+    if dataset_file.exists():
+        try:
+            manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            _log.warning("manifest_check_failed: corrupt manifest JSON: %s", e)
+            return False
+        expected_md5 = str(manifest.get("dataset_md5", ""))
+        actual_md5 = _md5(dataset_file)
+        if expected_md5 and expected_md5 != actual_md5:
+            _log.warning(
+                "manifest_check_failed: dataset MD5 mismatch (expected=%s, actual=%s)",
+                expected_md5, actual_md5,
+            )
+            return False
 
-    expected_md5 = str(manifest.get("dataset_md5", ""))
-    actual_md5 = _md5(dataset_file)
-    if expected_md5 != actual_md5:
-        _log.warning(
-            "manifest_check_failed: dataset MD5 mismatch (expected=%s, actual=%s)",
-            expected_md5, actual_md5,
-        )
-        return False
     return True
 
 
