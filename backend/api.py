@@ -228,6 +228,18 @@ async def lifespan(app: FastAPI):
     configure_structlog()
     logger = get_logger("neurosynth.bootstrap")
 
+    # Pre-initialise all state to safe defaults so every endpoint works
+    # immediately after yield, even before model loading completes.
+    for _attr in ("predictor", "multi_predictor", "temporal", "causal",
+                  "disease_classifier", "reporter", "rag", "fusion",
+                  "data_pipeline_svc", "scaler", "pipeline"):
+        setattr(app.state, _attr, None)
+    app.state.feature_names = []
+    app.state.dataset_stats = {}
+    app.state.metrics = {}
+    app.state.models_loaded = False
+    app.state.redis = None
+
     db = get_db()
     try:
         await db.connect()
@@ -258,106 +270,109 @@ async def lifespan(app: FastAPI):
         app.state.redis = None
         logger.warning("redis_connect_failed", error=str(exc))
 
-    try:
-        from backend.model_registry import ModelRegistry
-        from backend.report_generator_v4 import ClinicalReportGeneratorV4
-        models_dir = Path("models")
-        # Fetch model weights from R2 first if this container has none (free-tier
-        # deploys don't ship the gitignored artifacts). No-op when R2 is unconfigured.
-        _pull_models_from_r2(models_dir, logger)
-        dataset_file = _dataset_path()
-        # Skip pretrain when pre-built artifacts are present (cloud deploy) OR
-        # when SKIP_PRETRAIN is set.  _run_pretrain spawns a subprocess that
-        # downloads Kaggle data; without credentials it hangs on network I/O
-        # and blocks the lifespan indefinitely.
-        v5_present = (models_dir / "ensemble_v5" / "model_manifest_v5.json").exists()
-        from_cache = _manifest_valid(models_dir, dataset_file)
-        if not from_cache and not v5_present and not _os.getenv("SKIP_PRETRAIN"):
-            await _run_pretrain(dataset_file=dataset_file, models_dir=models_dir)
-
-        registry = ModelRegistry(models_dir=models_dir).load_all()
-
-        # v4 reporter: RAG-enhanced SOAP when pgvector + OpenAI key are available;
-        # falls back to plain Claude SOAP (v3) then Jinja2 template (v2).
-        reporter = ClinicalReportGeneratorV4(db=db)
-
-        # RAG object for the literature search router
+    # ── Background model loader ───────────────────────────────────────────────
+    # Model loading (CatBoost + LightGBM + RF + others) can take 60-120 s on a
+    # cold Render free-tier container.  Running it before yield blocks uvicorn
+    # from accepting any connections, so Render's 60 s health-check times out
+    # and marks the deploy update_failed.  By loading after yield the server
+    # starts immediately; /health passes; /ready shows models_loaded:false until
+    # the task completes, then flips to true.
+    async def _bg_load_models() -> None:
         try:
-            from src.neurosynth.llm.rag_v2 import PubMedRAG
-            import os as _os
-            app.state.rag = PubMedRAG(db=db, openai_api_key=_os.getenv("OPENAI_API_KEY"))
-            logger.info("rag_initialized rag_enabled=%s", app.state.rag.enabled)
-        except Exception as _rag_exc:
-            app.state.rag = None
-            logger.warning("rag_init_failed error=%s", _rag_exc)
+            from backend.model_registry import ModelRegistry
+            from backend.report_generator_v4 import ClinicalReportGeneratorV4
 
-        app.state.pipeline = None
-        app.state.predictor = registry.predictor
-        app.state.multi_predictor = registry.multi_predictor
-        app.state.temporal = registry.temporal
-        app.state.causal = registry.causal
-        app.state.disease_classifier = registry.disease_classifier
-        app.state.reporter = reporter
-        app.state.scaler = registry.scaler
-        app.state.feature_names = registry.feature_names
-        app.state.dataset_stats = registry.dataset_stats
-        app.state.metrics = registry.manifest.get("metrics", {})
-        app.state.models_loaded = True
-        logger.info("ml_models_loaded", source="cache" if from_cache else "pretrain")
+            models_dir = Path("models")
+            _loop = asyncio.get_event_loop()
 
-        # CrossAttentionFusion — load if available
-        try:
-            from src.neurosynth.models.fusion import CrossAttentionFusion
-            import torch as _torch
-            fusion_path = models_dir / "ensemble_v5" / "cross_attention_fusion.pt"
-            if fusion_path.exists():
-                fusion = CrossAttentionFusion(n_modalities=5)
-                fusion.load_state_dict(_torch.load(fusion_path, map_location="cpu"))
-                fusion.eval()
-                app.state.fusion = fusion
-                logger.info("cross_attention_fusion_loaded path=%s", fusion_path)
-            else:
+            # R2 pull is synchronous — run in thread so event loop stays free.
+            await _loop.run_in_executor(None, _pull_models_from_r2, models_dir, logger)
+
+            dataset_file = _dataset_path()
+            # Skip pretrain when pre-built artifacts are present (cloud deploy)
+            # or when SKIP_PRETRAIN env var is set.
+            v5_present = (models_dir / "ensemble_v5" / "model_manifest_v5.json").exists()
+            from_cache = _manifest_valid(models_dir, dataset_file)
+            if not from_cache and not v5_present and not _os.getenv("SKIP_PRETRAIN"):
+                await _run_pretrain(dataset_file=dataset_file, models_dir=models_dir)
+
+            # joblib.load calls are CPU/IO-bound — offload to thread pool.
+            registry = await _loop.run_in_executor(
+                None, lambda: ModelRegistry(models_dir=models_dir).load_all()
+            )
+
+            reporter = ClinicalReportGeneratorV4(db=db)
+
+            try:
+                from src.neurosynth.llm.rag_v2 import PubMedRAG
+                app.state.rag = PubMedRAG(db=db, openai_api_key=_os.getenv("OPENAI_API_KEY"))
+                logger.info("rag_initialized rag_enabled=%s", app.state.rag.enabled)
+            except Exception as _rag_exc:
+                app.state.rag = None
+                logger.warning("rag_init_failed error=%s", _rag_exc)
+
+            app.state.pipeline = None
+            app.state.predictor = registry.predictor
+            app.state.multi_predictor = registry.multi_predictor
+            app.state.temporal = registry.temporal
+            app.state.causal = registry.causal
+            app.state.disease_classifier = registry.disease_classifier
+            app.state.reporter = reporter
+            app.state.scaler = registry.scaler
+            app.state.feature_names = registry.feature_names
+            app.state.dataset_stats = registry.dataset_stats
+            app.state.metrics = registry.manifest.get("metrics", {})
+            app.state.models_loaded = True
+            logger.info("ml_models_loaded", source="cache" if from_cache else "pretrain")
+
+            try:
+                from src.neurosynth.models.fusion import CrossAttentionFusion
+                import torch as _torch
+                fusion_path = models_dir / "ensemble_v5" / "cross_attention_fusion.pt"
+                if fusion_path.exists():
+                    fusion = CrossAttentionFusion(n_modalities=5)
+                    fusion.load_state_dict(_torch.load(fusion_path, map_location="cpu"))
+                    fusion.eval()
+                    app.state.fusion = fusion
+                    logger.info("cross_attention_fusion_loaded path=%s", fusion_path)
+                else:
+                    app.state.fusion = None
+            except Exception as _fx_exc:
                 app.state.fusion = None
-        except Exception as _fx_exc:
-            app.state.fusion = None
-            logger.debug("cross_attention_fusion_not_loaded reason=%s", _fx_exc)
+                logger.debug("cross_attention_fusion_not_loaded reason=%s", _fx_exc)
 
-        # Data pipeline service — seed data_sources table
-        try:
-            from backend.services.data_pipeline_service import DataPipelineService
-            svc = DataPipelineService(db=db)
-            await svc.upsert_sources()
-            app.state.data_pipeline_svc = svc
-            logger.info("data_pipeline_service_initialized")
-        except Exception as _svc_exc:
-            app.state.data_pipeline_svc = None
-            logger.warning("data_pipeline_service_failed error=%s", _svc_exc)
-    except Exception as exc:
-        logger.warning("ml_models_load_failed", error=str(exc))
-        app.state.pipeline = None
-        app.state.predictor = None
-        app.state.multi_predictor = None
-        app.state.temporal = None
-        app.state.causal = None
-        app.state.disease_classifier = None
-        app.state.reporter = None
-        app.state.rag = None
-        app.state.fusion = None
-        app.state.data_pipeline_svc = None
-        app.state.scaler = None
-        app.state.feature_names = []
-        app.state.dataset_stats = {}
-        app.state.metrics = {}
-        app.state.models_loaded = False
+            try:
+                from backend.services.data_pipeline_service import DataPipelineService
+                svc = DataPipelineService(db=db)
+                await svc.upsert_sources()
+                app.state.data_pipeline_svc = svc
+                logger.info("data_pipeline_service_initialized")
+            except Exception as _svc_exc:
+                app.state.data_pipeline_svc = None
+                logger.warning("data_pipeline_service_failed error=%s", _svc_exc)
+
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("ml_models_load_failed", error=str(exc))
+            app.state.models_loaded = False
+
+    model_task = asyncio.create_task(_bg_load_models())
+    app.state.model_task = model_task
 
     # Fire-and-forget keepalive (only active when KEEPALIVE_ENABLED is set).
     app.state.keepalive_task = asyncio.create_task(_keepalive_ping(logger))
 
-    yield
+    yield  # ← server starts accepting connections here; health check passes immediately
 
     keepalive_task = getattr(app.state, "keepalive_task", None)
     if keepalive_task is not None:
         keepalive_task.cancel()
+    model_task.cancel()
+    try:
+        await asyncio.wait_for(asyncio.shield(model_task), timeout=2.0)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
+        pass
     await _drain_celery_queue()
     redis_client = getattr(app.state, "redis", None)
     if redis_client is not None:
