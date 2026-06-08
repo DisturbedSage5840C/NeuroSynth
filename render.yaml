@@ -1,18 +1,10 @@
-# NeuroSynth v5 — all-in-one free deployment (Render Blueprint).
+# NeuroSynth v5 — production deployment (Render Blueprint).
 #
 # Stack: FastAPI backend + Vite SPA frontend + Neon Postgres + Upstash Redis.
 # Free-tier notes:
-#  - The web service sleeps after ~15 min idle (first request cold-starts ~30-60s).
-#  - Free Postgres below EXPIRES 30 days. For permanent DB delete the `databases:`
-#    block and set NEUROSYNTH_POSTGRES_DSN to a Neon URL (free forever tier).
-#  - embed-worker runs once to populate pgvector with 10k PubMed abstracts.
-#    After it finishes it exits — Render background workers restart on failure.
-
-databases:
-  - name: neurosynth-db
-    plan: free
-    databaseName: neurosynth
-    user: neurosynth
+#  - Web service sleeps after ~15 min idle; first request cold-starts ~60-90s.
+#  - Model artifacts are pulled from GitHub Release on build (no R2 needed).
+#  - Neon Postgres free tier is permanent (no 30-day expiry).
 
 services:
   # ── Backend API (FastAPI) ─────────────────────────────────────────────────
@@ -20,85 +12,51 @@ services:
     name: neurosynth-api
     runtime: python
     plan: free
-    buildCommand: pip install -r backend/requirements-deploy.txt
+    buildCommand: >-
+      pip install -r backend/requirements-deploy.txt &&
+      mkdir -p models &&
+      curl -fsSL https://github.com/DisturbedSage5840C/NeuroSynth/releases/download/v5-models/neurosynth-models-v5.tar.gz
+      | tar xz
     startCommand: uvicorn backend.api:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.7"
+      - key: PYTHONPATH
+        value: .:/opt/render/project/src
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+      - key: KMP_DUPLICATE_LIB_OK
+        value: "TRUE"
       - key: NEUROSYNTH_APP_ENV
         value: prod
       - key: NEUROSYNTH_AUTH_COOKIE_SECURE
         value: "true"
+      # Neon Postgres — set this to your Neon connection string.
       - key: NEUROSYNTH_POSTGRES_DSN
-        fromDatabase:
-          name: neurosynth-db
-          property: connectionString
+        sync: false
       - key: NEUROSYNTH_JWT_SECRET
         generateValue: true
       - key: NEUROSYNTH_PATIENT_HASH_SECRET
         generateValue: true
-      # Upstash Redis URL — enables rate limiting + caching.
+      # Upstash Redis URL — get from upstash.com (free tier).
       - key: NEUROSYNTH_REDIS_URL
         sync: false
-      # Anthropic API key — Claude SOAP report generation.
-      - key: ANTHROPIC_API_KEY
-        sync: false
-      # OpenAI API key — RAG corpus embedding + literature search.
-      - key: OPENAI_API_KEY
-        sync: false
-      # Enable pgvector RAG in SOAP reports (set "1" after embed-worker runs).
-      - key: RAG_ENABLED
-        value: "0"
-      # CORS: deployed frontend origin(s), comma-separated.
+      # CORS: set to your Vercel frontend URL after first deploy.
       - key: NEUROSYNTH_ALLOWED_ORIGINS
         sync: false
-      # Keep free-tier warm (self-pings /health every 10 min).
+      # Optional: Anthropic key enables Claude SOAP reports.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: NEUROSYNTH_ANTHROPIC_MODEL
+        value: claude-sonnet-4-6
+      # Keep free-tier warm.
       - key: KEEPALIVE_ENABLED
         value: "true"
-      # Cloudflare R2 model weights (pulled on startup; gitignored artifacts).
-      - key: R2_ACCOUNT_ID
-        sync: false
-      - key: R2_ACCESS_KEY_ID
-        sync: false
-      - key: R2_SECRET_ACCESS_KEY
-        sync: false
-      - key: R2_BUCKET
-        value: neurosynth-models
-      # v5 data pipeline
-      - key: KAGGLE_USERNAME
-        sync: false
-      - key: KAGGLE_KEY
-        sync: false
-      - key: NCBI_API_KEY
-        sync: false
-
-  # ── PubMed RAG Embed Worker ───────────────────────────────────────────────
-  # One-shot background worker: fetches 10k PubMed abstracts, embeds them
-  # with OpenAI text-embedding-3-small, stores in Neon pgvector.
-  # Exits 0 on success. Render auto-restarts on non-zero exit.
-  - type: worker
-    name: neurosynth-embed-worker
-    runtime: python
-    plan: free
-    buildCommand: pip install -r backend/requirements-deploy.txt
-    startCommand: >
-      python scripts/data/v5/build_pubmed_corpus.py
-        --max 10000
-        --out data/pubmed_corpus.jsonl
-      && python scripts/data/v5/embed_corpus.py
-        --input data/pubmed_corpus.jsonl
-    envVars:
-      - key: PYTHON_VERSION
-        value: "3.12.7"
-      - key: NEUROSYNTH_POSTGRES_DSN
-        fromDatabase:
-          name: neurosynth-db
-          property: connectionString
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: NCBI_API_KEY
-        sync: false
 
   # ── Frontend (Vite static SPA) ────────────────────────────────────────────
   - type: web
@@ -107,7 +65,7 @@ services:
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: frontend/dist
     envVars:
-      # Set to backend URL after first deploy: https://neurosynth-api.onrender.com
+      # Set to your Render backend URL: https://neurosynth-api.onrender.com
       - key: VITE_API_BASE_URL
         sync: false
     routes:

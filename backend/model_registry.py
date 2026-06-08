@@ -9,7 +9,6 @@ from typing import Any
 
 import joblib
 import numpy as np
-import torch
 
 logger = logging.getLogger(__name__)
 
@@ -179,13 +178,18 @@ class ModelRegistry:
                 predictor.has_lgbm = False
             predictor._refresh_weights()
 
-        temporal = TemporalProgressionModel(feature_names)
-        lstm_state = torch.load(
-            self.models_dir / "lstm_model.pt",
-            map_location="cpu",
-            weights_only=True,
-        )
-        temporal.model.load_state_dict(lstm_state)
+        try:
+            temporal = TemporalProgressionModel(feature_names)
+            import torch
+            lstm_state = torch.load(
+                self.models_dir / "lstm_model.pt",
+                map_location="cpu",
+                weights_only=True,
+            )
+            temporal.model.load_state_dict(lstm_state)
+        except Exception as _te:
+            logger.warning("temporal_model_load_skipped reason=%s", _te)
+            temporal = None
 
         variables = None
         vars_file = self.models_dir / "causal_vars.json"
