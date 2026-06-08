@@ -242,7 +242,10 @@ async def lifespan(app: FastAPI):
 
     db = get_db()
     try:
-        await db.connect()
+        # asyncpg.create_pool establishes min_size connections synchronously
+        # before returning; without an OS-level timeout the SSL/SCRAM handshake
+        # to Neon can hang for 2+ minutes and prevent lifespan from yielding.
+        await asyncio.wait_for(db.connect(), timeout=15)
         logger.info("database_connected")
         # Apply idempotent schema so fresh deploys (Neon/Render) have tables.
         try:
@@ -250,7 +253,10 @@ async def lifespan(app: FastAPI):
 
             schema_path = _Path(__file__).with_name("db_schema.sql")
             if schema_path.exists():
-                await db.apply_schema(schema_path.read_text(encoding="utf-8"))
+                await asyncio.wait_for(
+                    db.apply_schema(schema_path.read_text(encoding="utf-8")),
+                    timeout=20,
+                )
                 logger.info("database_schema_applied")
         except Exception as schema_exc:
             logger.warning("database_schema_apply_failed", error=str(schema_exc))
@@ -264,7 +270,7 @@ async def lifespan(app: FastAPI):
             socket_connect_timeout=5,
             socket_timeout=5,
         )
-        await app.state.redis.ping()
+        await asyncio.wait_for(app.state.redis.ping(), timeout=8)
         logger.info("redis_connected")
     except Exception as exc:
         app.state.redis = None
