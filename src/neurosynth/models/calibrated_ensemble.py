@@ -462,10 +462,19 @@ class CalibratedEnsemble:
 
     def load_from_disk(self) -> None:
         """Load all artifacts from disk."""
+        _name_to_attr = {
+            "random_forest": "rf",
+            "gradient_boosting": "gb",
+            "catboost": "catboost",
+            "logistic_regression": "lr",
+            "lightgbm": "lgbm",
+            "tabnet": "tabnet",
+        }
         for name, _ in self.base_models:
             path = self.models_dir / f"{name}_model.pkl"
             if path.exists():
-                setattr(self, name.replace("-", "_"), joblib.load(path))
+                attr = _name_to_attr.get(name, name.replace("-", "_"))
+                setattr(self, attr, joblib.load(path))
 
         meta_path = self.models_dir / "meta_learner.pkl"
         if meta_path.exists():

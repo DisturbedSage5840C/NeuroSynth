@@ -1,6 +1,6 @@
 import { authStore } from "@/state/authStore";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 const IS_BROWSER = typeof window !== "undefined";
 const IS_HOSTED = IS_BROWSER && !["localhost", "127.0.0.1"].includes(window.location.hostname);
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true" || (IS_HOSTED && !import.meta.env.VITE_API_BASE_URL);
@@ -295,7 +295,7 @@ async function liveFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   headers.set("Content-Type", headers.get("Content-Type") || "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, credentials: "include" });
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
 
   if (response.status === 401 && authStore.getState().refreshToken) {
     const refreshed = await refreshToken();
@@ -355,18 +355,43 @@ export async function login(
       role: account.role,
     };
   }
+  // On localhost the backend runs with DEV_BYPASS_AUTH — skip the network call
+  // entirely and authenticate locally. All subsequent API calls go through the
+  // Vite proxy and the backend auto-authenticates every request.
+  const isLocalDev = typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+  const VALID_LOCAL_USERS: Record<string, string> = {
+    "clinician@neurosynth.local": "neurosynth",
+    "researcher@neurosynth.local": "neurosynth",
+    "admin@neurosynth.local": "neurosynth",
+    "clinician": "neurosynth",
+    "researcher": "neurosynth",
+    "admin": "neurosynth",
+  };
+
+  if (isLocalDev) {
+    const expectedPassword = VALID_LOCAL_USERS[username.trim().toLowerCase()];
+    if (!expectedPassword || password !== expectedPassword) {
+      throw new Error("Invalid credentials");
+    }
+    const resolvedRole = username.includes("researcher") ? "RESEARCHER"
+      : username.includes("admin") ? "ADMIN"
+      : "CLINICIAN";
+    return { access_token: "local-dev", refresh_token: "local-dev", role: resolvedRole };
+  }
+
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    credentials: "include",
     body: JSON.stringify({ username, password, role }),
   });
-  if (!response.ok) throw new Error("Login failed");
+  if (!response.ok) throw new Error("Invalid credentials");
   const data = await response.json();
   return {
-    access_token: "",
-    refresh_token: "",
-    role: data.user.role,
+    access_token: data.access_token ?? "",
+    refresh_token: data.refresh_token ?? "",
+    role: data.user?.role ?? role,
   };
 }
 

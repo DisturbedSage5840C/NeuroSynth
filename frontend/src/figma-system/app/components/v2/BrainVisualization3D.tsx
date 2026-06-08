@@ -119,6 +119,23 @@ function RegionMesh({
   );
 }
 
+// ── Public helper — maps SHAP values to { regionId, shap } objects ───────────
+
+export interface BrainRegion {
+  id: string;
+  label: string;
+  shap: number;
+}
+
+export function regionsFromShap(shapValues: SHAPValue[]): BrainRegion[] {
+  const agg = buildRegionMap(shapValues);
+  return AAL_REGIONS.map((r) => ({
+    id: r.id,
+    label: r.label,
+    shap: agg.get(r.id) ?? 0,
+  }));
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface BrainVisualization3DProps {

@@ -266,8 +266,13 @@ async def lifespan(app: FastAPI):
         # deploys don't ship the gitignored artifacts). No-op when R2 is unconfigured.
         _pull_models_from_r2(models_dir, logger)
         dataset_file = _dataset_path()
+        # Skip pretrain when pre-built artifacts are present (cloud deploy) OR
+        # when SKIP_PRETRAIN is set.  _run_pretrain spawns a subprocess that
+        # downloads Kaggle data; without credentials it hangs on network I/O
+        # and blocks the lifespan indefinitely.
+        v5_present = (models_dir / "ensemble_v5" / "model_manifest_v5.json").exists()
         from_cache = _manifest_valid(models_dir, dataset_file)
-        if not from_cache:
+        if not from_cache and not v5_present and not _os.getenv("SKIP_PRETRAIN"):
             await _run_pretrain(dataset_file=dataset_file, models_dir=models_dir)
 
         registry = ModelRegistry(models_dir=models_dir).load_all()
