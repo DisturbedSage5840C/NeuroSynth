@@ -134,7 +134,9 @@ class ModelRegistry:
         except Exception as exc:
             import traceback as _tb
             logger.warning("v5_ensemble_load_failed error=%s trace=%s", exc, _tb.format_exc())
-            return None, None
+            # Re-raise so the caller can surface the actual failure reason instead of
+            # silently falling back to the legacy path (which requires rf_model.pkl).
+            raise
 
     # ------------------------------------------------------------------
 
@@ -175,7 +177,7 @@ class ModelRegistry:
                 raise FileNotFoundError(
                     f"v5 ensemble failed (see v5_ensemble_load_failed log) and legacy "
                     f"rf_model.pkl missing at {rf_path}. "
-                    f"Files in models_dir: {present[:30]}"
+                    f"Files in models_dir: {present}"
                 )
             predictor = BiomarkerPredictor(feature_names)
             predictor.rf = joblib.load(rf_path)
