@@ -26,41 +26,57 @@ async def list_patients(
     db: Database = Depends(get_database),
 ) -> PatientListResponse:
     _ = user
+    now = datetime.now(tz=UTC)
     if db.pool:
-        rows = await db.pool.fetch(
-            """
-            SELECT
-                p.id,
-                p.name,
-                a.probability,
-                a.risk_level,
-                a.disease_classification,
-                COALESCE(a.created_at, p.updated_at) AS updated_at
-            FROM patients p
-            LEFT JOIN LATERAL (
-                SELECT probability, risk_level, disease_classification, created_at
-                FROM analyses
-                WHERE patient_id = p.id
-                ORDER BY created_at DESC
-                LIMIT 1
-            ) a ON TRUE
-            ORDER BY updated_at DESC
-            LIMIT 50
-            """
-        )
-        items = [
-            PatientSummary(
-                patient_id=str(r["id"]),
-                name=str(r["name"]),
-                probability=float(r["probability"]) if r["probability"] is not None else None,
-                risk_level=str(r["risk_level"]) if r["risk_level"] is not None else None,
-                disease_classification=dict(r["disease_classification"]) if r["disease_classification"] is not None else None,
-                updated_at=r["updated_at"],
+        try:
+            rows = await db.pool.fetch(
+                """
+                SELECT
+                    p.id,
+                    p.name,
+                    a.probability,
+                    a.risk_level,
+                    a.disease_classification,
+                    COALESCE(a.created_at, p.updated_at, NOW()) AS updated_at
+                FROM patients p
+                LEFT JOIN (
+                    SELECT DISTINCT ON (patient_id)
+                        patient_id, probability, risk_level, disease_classification, created_at
+                    FROM analyses
+                    ORDER BY patient_id, created_at DESC
+                ) a ON a.patient_id = p.id
+                ORDER BY COALESCE(a.created_at, p.updated_at) DESC NULLS LAST
+                LIMIT 50
+                """
             )
-            for r in rows
-        ]
+            items = [
+                PatientSummary(
+                    patient_id=str(r["id"]),
+                    name=str(r["name"]),
+                    probability=float(r["probability"]) if r["probability"] is not None else None,
+                    risk_level=str(r["risk_level"]) if r["risk_level"] is not None else None,
+                    disease_classification=dict(r["disease_classification"]) if r["disease_classification"] is not None else None,
+                    updated_at=r["updated_at"] or now,
+                )
+                for r in rows
+            ]
+        except Exception:
+            # analyses table may not exist yet — fall back to patients-only query
+            try:
+                rows = await db.pool.fetch(
+                    "SELECT id, name, updated_at FROM patients ORDER BY updated_at DESC NULLS LAST LIMIT 50"
+                )
+                items = [
+                    PatientSummary(
+                        patient_id=str(r["id"]),
+                        name=str(r["name"]),
+                        updated_at=r["updated_at"] or now,
+                    )
+                    for r in rows
+                ]
+            except Exception:
+                items = []
     else:
-        now = datetime.now(tz=UTC)
         items = [
             PatientSummary(patient_id="P-001", name="Nakamura, Kenji", updated_at=now),
             PatientSummary(patient_id="P-002", name="Okonkwo, Adaeze", updated_at=now),
