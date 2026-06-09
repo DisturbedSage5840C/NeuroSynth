@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '../../../lib/api';
 import type { Patient } from '../data/mock-data';
+import { useAuthStore } from '../../../state/authStore';
 
 interface ApiPatientSummary {
   patient_id?: string;
@@ -36,12 +37,14 @@ function toUiPatient(item: ApiPatientSummary, index: number): Patient {
 }
 
 export function usePatients() {
-  const enabled = typeof window !== 'undefined' && localStorage.getItem('ns_logged_in') === 'true';
+  const accessToken = useAuthStore((s) => s.accessToken);
 
   return useQuery({
     queryKey: ['patients'],
     queryFn: () => apiFetch<{ items: ApiPatientSummary[] }>('/patients'),
     select: (data) => data.items.map(toUiPatient),
-    enabled,
+    enabled: !!accessToken,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 }

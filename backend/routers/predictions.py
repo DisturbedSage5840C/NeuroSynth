@@ -341,4 +341,7 @@ async def feature_importance(request: Request):
     predictor = getattr(request.app.state, "predictor", None)
     if predictor is None:
         return {}
-    return predictor.get_feature_importance()
+    try:
+        return predictor.get_feature_importance()
+    except Exception:
+        return {}

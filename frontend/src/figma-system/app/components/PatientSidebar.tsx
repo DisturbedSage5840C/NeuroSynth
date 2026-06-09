@@ -6,6 +6,7 @@ import { RiskBadge } from './UncertaintyBadge';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../../../lib/api';
 import { useAnalysisStore } from '../../../state/analysisStore';
+import { useAuthStore } from '../../../state/authStore';
 
 interface PatientSidebarProps {
   selectedId: string;
@@ -17,13 +18,18 @@ type SortKey = 'deteriorationProb' | 'name' | 'lastUpdated';
 export function PatientSidebar({ selectedId, onSelect }: PatientSidebarProps) {
   const { data: patients = [], isLoading } = usePatients();
   const analysisResult = useAnalysisStore((s) => s.result);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('deteriorationProb');
   const [sortAsc, setSortAsc] = useState(false);
   const lastAutoSelected = useRef<string | null>(null);
 
-  const displayPatients: Patient[] = patients.length ? patients : mockPatients;
+  // Only fall back to mock patients when not logged in (demo mode).
+  // When logged in, show real patients (or empty list while loading).
+  const displayPatients: Patient[] = accessToken
+    ? patients
+    : (patients.length ? patients : mockPatients);
 
   const filtered = displayPatients
     .filter(p => p.name.toLowerCase().includes(search.toLowerCase()) || p.mrn.includes(search))
