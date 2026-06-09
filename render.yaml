@@ -57,6 +57,10 @@ services:
       # Keep free-tier warm.
       - key: KEEPALIVE_ENABLED
         value: "true"
+      # Never run the Kaggle pretrain subprocess on cloud deploys — models are
+      # downloaded from the GitHub Release tarball at build time.
+      - key: SKIP_PRETRAIN
+        value: "1"
 
   # ── Frontend (Vite static SPA) ────────────────────────────────────────────
   - type: web
