@@ -132,7 +132,8 @@ class ModelRegistry:
             return adapter, disease_clf_v5
 
         except Exception as exc:
-            logger.warning("v5_ensemble_load_failed error=%s", exc)
+            import traceback as _tb
+            logger.warning("v5_ensemble_load_failed error=%s trace=%s", exc, _tb.format_exc())
             return None, None
 
     # ------------------------------------------------------------------
@@ -164,8 +165,20 @@ class ModelRegistry:
             logger.info("Using v5 CalibratedEnsemble (CatBoost+LightGBM+RF+GB+LR) as primary predictor")
         else:
             # Fall back to legacy BiomarkerPredictor
+            rf_path = self.models_dir / "rf_model.pkl"
+            if not rf_path.exists():
+                # Expose diagnostic: what IS in models_dir so we can debug tarball extraction
+                try:
+                    present = sorted(str(p) for p in self.models_dir.rglob("*") if p.is_file())
+                except Exception:
+                    present = ["<error listing>"]
+                raise FileNotFoundError(
+                    f"v5 ensemble failed (see v5_ensemble_load_failed log) and legacy "
+                    f"rf_model.pkl missing at {rf_path}. "
+                    f"Files in models_dir: {present[:30]}"
+                )
             predictor = BiomarkerPredictor(feature_names)
-            predictor.rf = joblib.load(self.models_dir / "rf_model.pkl")
+            predictor.rf = joblib.load(rf_path)
             predictor.gb = joblib.load(self.models_dir / "gb_model.pkl")
 
             third_model = self.models_dir / "xgboost_model.pkl"
