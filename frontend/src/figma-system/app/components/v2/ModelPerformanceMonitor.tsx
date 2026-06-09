@@ -45,7 +45,7 @@ export function ModelPerformanceMonitor({
     { label: 'F1', value: f1, target: 0.75, format: (v: number) => v.toFixed(4) },
     { label: 'ECE', value: ece, target: 0.05, format: (v: number) => v.toFixed(4), invert: true },
     { label: 'Brier', value: brier, target: 0.15, format: (v: number) => v.toFixed(4), invert: true },
-  ];
+  ].filter(m => m.value !== undefined) as Array<{ label: string; value: number; target: number; format: (v: number) => string; invert?: boolean }>;
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
