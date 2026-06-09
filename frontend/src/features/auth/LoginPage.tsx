@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { Brain, Loader2 } from 'lucide-react';
@@ -6,7 +6,6 @@ import { login } from '@/lib/api';
 import { useAuthStore } from '@/state/authStore';
 import './login.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const ROLES = ['CLINICIAN', 'RESEARCHER', 'ADMIN'] as const;
 type Role = (typeof ROLES)[number];
 
@@ -20,22 +19,16 @@ export function LoginPage() {
   const [role, setRole]         = useState<Role>('CLINICIAN');
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
-  const [slowWarn, setSlowWarn] = useState(false);
-  const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (hasRole || localStorage.getItem('ns_logged_in') === 'true') {
       navigate('/app', { replace: true });
     }
-    // Ping health endpoint to start backend cold-boot as early as possible.
-    fetch(`${API_BASE_URL}/health`).catch(() => {});
   }, [hasRole, navigate]);
 
   const onSubmit = async () => {
     setLoading(true);
-    setSlowWarn(false);
     setError('');
-    slowTimer.current = setTimeout(() => setSlowWarn(true), 4000);
     try {
       const payload = await login(username, password, role);
       setTokens(payload.access_token, payload.refresh_token, payload.role);
@@ -45,8 +38,6 @@ export function LoginPage() {
       setError(err instanceof Error ? err.message || 'Login failed' : 'Login failed');
     } finally {
       setLoading(false);
-      setSlowWarn(false);
-      if (slowTimer.current) clearTimeout(slowTimer.current);
     }
   };
 
@@ -126,12 +117,6 @@ export function LoginPage() {
           {loading ? <Loader2 size={16} className="animate-spin" /> : null}
           {loading ? 'Signing in…' : 'Enter Clinical Portal'}
         </button>
-
-        {loading && slowWarn && (
-          <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--muted-foreground)', marginTop: '8px' }}>
-            Server is waking up (free tier) — usually takes 30–60s on first login…
-          </div>
-        )}
 
         {error && <div className="login-error">{error}</div>}
 
