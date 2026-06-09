@@ -342,6 +342,10 @@ async def feature_importance(request: Request):
     if predictor is None:
         return {}
     try:
-        return predictor.get_feature_importance()
+        raw = predictor.get_feature_importance()
+        # Convert {features: [...], importances: [...]} → {feature: value, ...}
+        if isinstance(raw, dict) and "features" in raw and "importances" in raw:
+            return dict(zip(raw["features"], raw["importances"]))
+        return raw
     except Exception:
         return {}

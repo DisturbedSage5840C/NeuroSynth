@@ -592,6 +592,36 @@ class CalibratedEnsemble:
             return arr[:, :, 1] if arr.shape[-1] == 2 else arr.mean(axis=-1)
         return arr
 
+    def get_feature_importance(self) -> dict:
+        """Return averaged feature importances from all fitted tree-based models."""
+        candidates = [
+            ("random_forest", self.rf),
+            ("gradient_boosting", self.gb),
+            ("catboost", self.catboost),
+            ("lightgbm", self.lgbm),
+        ]
+        stacks = []
+        for _, model in candidates:
+            if model is None:
+                continue
+            fi = getattr(model, "feature_importances_", None)
+            if fi is not None and len(fi) == len(self.feature_names):
+                stacks.append(np.asarray(fi, dtype=float))
+
+        if not stacks:
+            return {"features": self.feature_names, "importances": [0.0] * len(self.feature_names)}
+
+        avg = np.mean(stacks, axis=0)
+        total = avg.sum()
+        if total > 0:
+            avg = avg / total
+
+        order = np.argsort(avg)[::-1]
+        return {
+            "features": [self.feature_names[i] for i in order],
+            "importances": [round(float(avg[i]), 6) for i in order],
+        }
+
     def evaluate(self, X_test: np.ndarray, y_test: np.ndarray) -> dict[str, float]:
         """Evaluate ensemble on test set."""
         base_probs = self._base_probs(X_test)
