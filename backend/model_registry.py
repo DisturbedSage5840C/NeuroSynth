@@ -139,9 +139,19 @@ class ModelRegistry:
 
     def load_all(self) -> SimpleNamespace:
         from backend.biomarker_model import BiomarkerPredictor, MultiDiseasePredictor
-        from backend.causal_engine import NeuralCausalDiscovery
         from backend.disease_classifier import DISEASES, DiseaseClassifier
-        from backend.temporal_model import TemporalProgressionModel
+
+        # torch-dependent modules — skip gracefully when torch is not installed
+        # (e.g. Render free-tier deploy uses requirements-deploy.txt without torch)
+        try:
+            from backend.causal_engine import NeuralCausalDiscovery as _NCD
+        except Exception:
+            _NCD = None  # type: ignore[assignment,misc]
+
+        try:
+            from backend.temporal_model import TemporalProgressionModel as _TPM
+        except Exception:
+            _TPM = None  # type: ignore[assignment,misc]
 
         scaler = joblib.load(self.models_dir / "scaler.pkl")
         feature_names = self._load_feature_names(scaler)
@@ -179,7 +189,9 @@ class ModelRegistry:
             predictor._refresh_weights()
 
         try:
-            temporal = TemporalProgressionModel(feature_names)
+            if _TPM is None:
+                raise ImportError("torch not available")
+            temporal = _TPM(feature_names)
             import torch
             lstm_state = torch.load(
                 self.models_dir / "lstm_model.pt",
@@ -196,10 +208,16 @@ class ModelRegistry:
         if vars_file.exists():
             variables = json.loads(vars_file.read_text(encoding="utf-8"))
 
-        causal_model = NeuralCausalDiscovery(variables=variables)
-        causal_path = self.models_dir / "causal_graph.npy"
-        if causal_path.exists():
-            causal_model.latest_W = np.load(causal_path)
+        try:
+            if _NCD is None:
+                raise ImportError("torch not available")
+            causal_model = _NCD(variables=variables)
+            causal_path = self.models_dir / "causal_graph.npy"
+            if causal_path.exists():
+                causal_model.latest_W = np.load(causal_path)
+        except Exception as _ce:
+            logger.warning("causal_model_load_skipped reason=%s", _ce)
+            causal_model = None
 
         if v5_disease_clf is not None:
             disease_clf = v5_disease_clf
