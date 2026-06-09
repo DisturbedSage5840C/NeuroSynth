@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { patients } from '../data/mock-data';
 import { ForecastChart } from './ForecastChart';
 import { ConnectomeGraph } from './ConnectomeGraph';
@@ -12,6 +13,7 @@ import type { AnalysisResult } from '../types/analysis';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { RiskScoreGauge, SHAPWaterfallPanel, CounterfactualPanel, ClinicalReportViewer, TrajectoryChart48, LIMEExplanationPanel, ModelPerformanceMonitor } from './v2';
 import { usePatients } from '../hooks/usePatients';
+import { apiFetch } from '../../../lib/api';
 
 // Lazy: keeps Three.js out of the main bundle until an analysis renders the brain.
 const BrainVisualization3D = lazy(() => import('./v2/BrainVisualization3D'));
@@ -24,6 +26,11 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
   const { data: livePatients = [] } = usePatients();
   const analysisResult = useAnalysisStore((s) => s.result);
   const setResult = useAnalysisStore((s) => s.setResult);
+  const { data: modelPerf } = useQuery({
+    queryKey: ['modelPerformance'],
+    queryFn: () => apiFetch<{ roc_auc?: number; f1_weighted?: number; accuracy?: number }>('/predictions/model/performance'),
+    staleTime: 5 * 60 * 1000,
+  });
   const allPatients = livePatients.length ? livePatients : patients;
   const patient = allPatients.find((p) => p.id === selectedPatientId) || allPatients[0];
   const probability = analysisResult?.probability ?? patient.deteriorationProb;
@@ -241,7 +248,10 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
                   bandsUpper={analysisResult.confidence_bands?.upper || []}
                 />
                 <LIMEExplanationPanel
-                  limeValues={(analysisResult as any).lime_explanation || []}
+                  limeValues={((analysisResult as any).shap_values || []).map((s: any) => ({
+                    feature: s.feature,
+                    weight: s.value,
+                  }))}
                 />
               </div>
 
@@ -251,17 +261,22 @@ export function Dashboard({ selectedPatientId }: DashboardProps) {
                   counterfactuals={(analysisResult as any).counterfactuals || []}
                 />
                 <ClinicalReportViewer
-                  report={(analysisResult as any).report_soap || null}
+                  report={(analysisResult as any).report || null}
                 />
               </div>
 
               {/* Model Performance */}
               <ModelPerformanceMonitor
-                auc={(analysisResult as any).validation?.auc}
-                ece={(analysisResult as any).validation?.ece}
-                f1={(analysisResult as any).validation?.f1}
-                decision={(analysisResult as any).validation?.decision}
-                gates={(analysisResult as any).validation?.gates || []}
+                auc={modelPerf?.roc_auc}
+                f1={modelPerf?.f1_weighted}
+                decision={modelPerf ? (
+                  (modelPerf.roc_auc ?? 0) >= 0.8 && (modelPerf.f1_weighted ?? 0) >= 0.75
+                    ? 'PROMOTE' : 'HUMAN_REVIEW'
+                ) : undefined}
+                gates={modelPerf ? [
+                  { name: 'AUC Threshold', type: 'hard', result: (modelPerf.roc_auc ?? 0) >= 0.8 ? 'PASS' : 'HARD_FAIL', metric: 'auc', value: modelPerf.roc_auc ?? 0, threshold: 0.80 },
+                  { name: 'F1 Threshold', type: 'hard', result: (modelPerf.f1_weighted ?? 0) >= 0.75 ? 'PASS' : 'HARD_FAIL', metric: 'f1', value: modelPerf.f1_weighted ?? 0, threshold: 0.75 },
+                ] : []}
               />
             </>
           )}
