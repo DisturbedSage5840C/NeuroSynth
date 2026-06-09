@@ -215,6 +215,7 @@ class ReadyResponse(BaseModel):
     fusion_loaded: bool = False
     pgvector_ok: bool = False
     schema_version: str = "v5"
+    startup_error: str = ""
 
 
 class QueueDepthResponse(BaseModel):

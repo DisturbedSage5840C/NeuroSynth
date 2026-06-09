@@ -238,6 +238,7 @@ async def lifespan(app: FastAPI):
     app.state.dataset_stats = {}
     app.state.metrics = {}
     app.state.models_loaded = False
+    app.state.startup_error = ""
     app.state.redis = None
 
     db = get_db()
@@ -360,8 +361,11 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.warning("ml_models_load_failed", error=str(exc))
+            import traceback as _tb
+            err_detail = f"{exc}\n{_tb.format_exc()}"
+            logger.warning("ml_models_load_failed", error=err_detail)
             app.state.models_loaded = False
+            app.state.startup_error = err_detail
 
     model_task = asyncio.create_task(_bg_load_models())
     app.state.model_task = model_task

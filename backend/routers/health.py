@@ -55,6 +55,7 @@ async def ready(request: Request, db: Database = Depends(get_database)) -> Ready
             pgvector_ok = False
 
     is_ready = db_ok and models_loaded
+    startup_error = getattr(request.app.state, "startup_error", "")
     return ReadyResponse(
         status="ready" if is_ready else "degraded",
         database=db_ok,
@@ -64,4 +65,5 @@ async def ready(request: Request, db: Database = Depends(get_database)) -> Ready
         fusion_loaded=fusion_loaded,
         pgvector_ok=pgvector_ok,
         schema_version="v5",
+        startup_error=startup_error,
     )
