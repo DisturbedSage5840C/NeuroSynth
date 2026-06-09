@@ -13,7 +13,7 @@ services:
     runtime: python
     plan: free
     buildCommand: >-
-      pip install -r backend/requirements-deploy.txt &&
+      pip install --no-cache-dir -r backend/requirements-deploy.txt &&
       mkdir -p models &&
       curl -fsSL https://github.com/DisturbedSage5840C/NeuroSynth/releases/download/v5-models/neurosynth-models-v5.tar.gz
       | tar xz
