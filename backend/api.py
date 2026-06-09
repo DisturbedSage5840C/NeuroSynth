@@ -421,7 +421,13 @@ async def auth_context_middleware(request: Request, call_next):
         request.state.user = {"user_id": "dev-local", "role": "ADMIN"}
         return await call_next(request)
 
+    # Accept token from cookie OR Authorization: Bearer header
     token = request.cookies.get(ACCESS_COOKIE)
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+
     request.state.user = None
     if token:
         try:
