@@ -36,6 +36,8 @@ async def login(payload: LoginRequest, response: Response) -> TokenEnvelope:
     response.set_cookie(REFRESH_COOKIE, refresh, httponly=True, secure=settings.auth_cookie_secure, samesite="lax", max_age=settings.refresh_token_days * 86400)
 
     return TokenEnvelope(
+        access_token=access,
+        refresh_token=refresh,
         access_expires_in=settings.access_token_minutes * 60,
         refresh_expires_in=settings.refresh_token_days * 86400,
         user=UserContext(user_id=payload.username, role=role),
@@ -50,6 +52,11 @@ async def login(payload: LoginRequest, response: Response) -> TokenEnvelope:
 )
 async def refresh_token(request: Request, response: Response) -> TokenEnvelope:
     refresh_cookie = request.cookies.get(REFRESH_COOKIE)
+    # Also accept refresh token from Authorization header for cross-origin SPAs
+    if not refresh_cookie:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            refresh_cookie = auth_header[7:]
     if not refresh_cookie:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
     try:
@@ -66,6 +73,8 @@ async def refresh_token(request: Request, response: Response) -> TokenEnvelope:
     response.set_cookie(REFRESH_COOKIE, refresh, httponly=True, secure=settings.auth_cookie_secure, samesite="lax", max_age=settings.refresh_token_days * 86400)
 
     return TokenEnvelope(
+        access_token=access,
+        refresh_token=refresh,
         access_expires_in=settings.access_token_minutes * 60,
         refresh_expires_in=settings.refresh_token_days * 86400,
         user=user,

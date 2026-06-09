@@ -397,16 +397,23 @@ export async function login(
 
 export async function refreshToken(): Promise<boolean> {
   if (DEMO_MODE) return true;
+  const stored = authStore.getState();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (stored.refreshToken) {
+    headers["Authorization"] = `Bearer ${stored.refreshToken}`;
+  }
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
+    headers,
   });
 
   if (!response.ok) return false;
   const payload = await response.json();
-  const role = String(payload?.user?.role ?? authStore.getState().role ?? "CLINICIAN");
-  authStore.getState().setTokens("", "", role);
+  const access = String(payload?.access_token ?? "");
+  const refresh = String(payload?.refresh_token ?? stored.refreshToken ?? "");
+  const role = String(payload?.user?.role ?? stored.role ?? "CLINICIAN");
+  if (!access) return false;
+  authStore.getState().setTokens(access, refresh, role);
   return true;
 }
 
